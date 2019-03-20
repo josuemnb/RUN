@@ -25,24 +25,24 @@
     }
 
 # Documentation
-  # Basic data types
+  ## Basic data types
   bool, number, real, string (string works as class)
   
-  # Builtin Functions
-  # print(ln)
+  ## Builtin Functions
+  ### print(ln)
     print(ln)(string|bool|number|real)
     behaves like golang println - values separeted by comma, but without space between them
   
-  # Keywords
+  ## Keywords
   
-  # import
+  ### import
     import modules
-  # module
+  ### module
     first word inside modules
-  # main
+  ### main
     keyword that defines main program - needs to be present in order to compile
     it can be defined without paranteses but can accepts parameters as a function
-  # loop
+  ### loop
     similar to for/while 
     example : 
               
@@ -62,13 +62,13 @@
               
               }
               
-  # return, break, nil, false, true
+  ### return, break, nil, false, true
     like any other language
-  # this
+  ### this
     refering to the current class construction
-  # if else 
+  ### if else 
     conditional like golang - without parenteses
-  # cpp 
+  ### cpp 
     special keyword to inject c code
     very helpful while creating modules
   
