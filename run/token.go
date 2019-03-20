@@ -1,0 +1,99 @@
+package run
+
+const (
+	VOID int = 1 + iota
+	NULL
+	VARIABLE
+	GROUPING
+	CALL
+	GET
+	SET
+	LITERAL
+	UNARY
+	BINARY
+	ASSIGN
+	LOGICAL
+	BOOLEAN
+	NAME
+	FUNCTION
+	EMPTY
+	LEFT_PAREN
+	RIGHT_PAREN
+	LEFT_BRACE
+	RIGHT_BRACE
+	LEFT_BRACKET
+	RIGHT_BRACKET
+	BRACKETS
+	BETWEEN
+	COMMA
+	DOT
+	MINUS
+	PLUS
+	SEMICOLON
+	SLASH
+	STAR
+	DECLARE
+	EOL
+	RANGE
+	BANG
+	BANG_EQUAL
+	EQUAL
+	EQUAL_EQUAL
+	GREATER
+	GREATER_EQUAL
+	LESS
+	LESS_EQUAL
+	IDENTIFIER
+	AND
+	ELSE
+	FALSE
+	IF
+	ELSEIF
+	NIL
+	OR
+	BREAK
+	PRINT
+	PRINTLN
+	RETURN
+	SUPER
+	THIS
+	TRUE
+	LOOP
+	EOF
+	INCREMENT
+	DECREMENT
+	EXPRESSION
+	MAIN
+	CLASS
+	METHOD
+	FIELD
+	PARAM
+	SEQUENCE
+	NEWLINE
+	ASM
+	CPP
+	IMPORT
+	MODULE
+	MESSAGE
+	QUOTE
+	NUMBER int = 128
+	REAL   int = 129
+	BOOL   int = 130
+	STRING int = 131
+	MAP    int = 8192
+	LIST   int = 4096
+	STACK  int = 2048
+	ARRAY  int = 1024
+)
+
+type Node struct {
+	Type  int //variable, function, literal, binary
+	Value interface{}
+}
+
+type Token struct {
+	Type   int
+	Lexeme string
+	Line   int
+	Col    int
+}

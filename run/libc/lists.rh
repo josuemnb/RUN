@@ -1,0 +1,75 @@
+#pragma once
+
+class list_VALUE
+{
+  public:
+    VALUE *values;
+    int size;
+    int cap;
+
+    list_VALUE()
+    {
+        values = (VALUE *)malloc(sizeof(VALUE) * 16);
+        size = 0;
+        cap = 16;
+    }
+
+    void method_add(VALUE value)
+    {
+        if (size + 1 >= cap)
+        {
+            cap *= 1.5;
+            values = (VALUE *)realloc(values, sizeof(VALUE) * cap);
+        }
+        VALUE v(value);
+        values[size] = v;
+        size++;
+    }
+
+    VALUE method_get(int idx) {
+        return values[idx];
+    }
+
+    bool method_has(VALUE value) {
+        for(int i=0;i<size;i++) {
+            if(values[i]==value) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    number method_size() {
+        return size;
+    }
+
+    void method_set(int idx, VALUE value) {
+        if(idx>=size) {
+            exit(-1);
+        }
+        VALUE v(value);
+        values[idx] = v;
+    }
+
+    void method_clear() {
+        free(values);
+        values = (VALUE *)malloc(sizeof(VALUE) * 16);
+        size = 0;
+        cap = 16;
+    }
+
+    VALUE operator[](int i) const {
+        if(i>=size) {
+            exit(-1);
+        }
+        return values[i];
+    }
+
+    VALUE &operator[](int index)
+    {
+        if(index>=size) {
+            exit(-1);
+        }
+        return values[index];
+    }
+};

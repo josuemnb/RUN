@@ -1,0 +1,209 @@
+module files
+
+cpp {`
+    #include <stdio.h>
+    #include <stdlib.h>
+    #include <unistd.h>
+    #include <fcntl.h>
+    #include <sys/stat.h>
+`}
+
+FileInfo {
+    __name:string
+    __size:number
+    __exist:bool
+    this(n:string) {
+        __name = n
+        cpp {`
+            int fd = open(field___name.value,O_RDONLY);
+            if(fd>-1) {
+                field___exist = fd>-1;
+                struct stat s;
+                fstat(fd,&s);
+                field___size = s.st_size;
+            }
+        `}
+    }
+    size():number {
+        return __size
+    }
+
+    exist():bool {
+        return __exist
+    }
+}
+
+FileReader {
+    __fp:number
+    __name:string
+    __has:bool
+    open(name:string) {
+        __name = name
+        cpp {`
+            field___fp  = open(field___name.value,O_RDONLY);
+        `}
+        __has = true
+    }
+
+    readNumber():number{
+        n:number
+        cpp {`
+            read(field___fp,&var_n, sizeof(var_n));              
+        `}
+        return n
+    }
+    read(size:number):string {
+        s:string
+        if __has==false {
+            return s
+        }
+        cpp {`
+            char buf[param_size];
+            size_t nread;
+            nread = read(field___fp, buf, param_size);   
+            buf[nread] = '\0';     
+            var_s = buf;
+        `}
+        return s
+    }
+    readLine():string {
+        s:string
+        cpp {`
+            char buf[128];
+            char c;
+            int i = 0,nread;
+            while((nread =read(field___fp, &c, 1))>0) {
+                if(c=='\r' || c=='\n') {
+                    buf[i] = '\0';                   
+                    var_s = buf;
+                    break;
+                }
+                buf[i] = c;
+                i++;
+            }                       
+            if(nread<1)
+                field___has=false;                
+        `}
+        return s
+    }
+    has():bool {
+        return __has
+    }
+
+    position():number {
+        ret:number
+        cpp {`
+            var_ret = lseek(field___fp,0,SEEK_CUR);
+        `}
+        return ret
+    }
+
+    goto(pos:number) {
+        cpp {`
+            lseek(field___fp,param_pos,SEEK_SET);
+        `}
+    }
+
+    close():bool {
+        ret:bool
+        cpp {`
+            var_ret = close(field___fp)>-1;
+        `}
+        return ret
+    }
+}
+
+FileAppender {
+    __fp:number
+    __name:string
+    open(name:string) {
+        __name = name
+        cpp {`
+            field___fp  = open(field___name.value,O_APPEND|O_CREAT|O_WRONLY, 0644);
+            if(field___fp<1) {
+                fprintf(stderr, "New File Error: %d\n", errno);
+            }
+        `}
+    }
+    append(s:string) {
+        cpp {`
+            write(field___fp,param_s.value,param_s.len);
+        `}
+    }
+
+    close():bool {
+        ret:bool
+        cpp {`
+            var_ret = close(field___fp)>-1;
+        `}
+        return ret
+    }
+}
+
+FileWriter {
+    __fp:number
+    __name:string
+    open(name:string) {
+        __name = name
+        cpp {`
+            field___fp  = creat(field___name.value, 0644);
+            if(field___fp<1) {
+                fprintf(stderr, "New File Error: %d\n", errno);
+            }
+        `}
+    }
+    write(n:number) {
+        cpp {`
+           write(field___fp,&param_n,sizeof(long));        
+        `}
+    }
+    write(s:string) {
+        cpp {`
+            write(field___fp,param_s.value,param_s.len);
+        `}
+    }
+
+    position():number {
+        ret:number
+        cpp {`
+            var_ret = lseek(field___fp,0,SEEK_CUR);
+        `}
+        return ret
+    }
+
+    goto(pos:number) {
+        cpp {`
+            lseek(field___fp,param_pos,SEEK_SET);
+        `}
+    }
+
+    close():bool {
+        ret:bool
+        cpp {`
+            var_ret = close(field___fp)>-1;
+        `}
+        return ret
+    }
+}
+
+open(n:string):FileReader {
+    f:FileReader
+    f.open(n)
+    return f
+}
+
+new(n:string):FileWriter {
+    f:FileWriter
+    f.open(n)
+    return f
+}
+
+append(n:string):FileAppender {
+    f:FileAppender
+    f.open(n)
+    return f
+}
+
+info(n:string):FileInfo {
+    return FileInfo(n)
+}

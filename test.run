@@ -1,0 +1,12 @@
+import files
+
+func():number {
+    return (10*13/4)
+}
+
+main {
+    info = files.info('test.run')
+    println(info.exist())
+    println(func())
+}
+

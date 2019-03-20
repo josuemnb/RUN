@@ -1,0 +1,97 @@
+#pragma once
+
+class map_KEY_VALUE
+{
+  public:
+    KEY *keys;
+    VALUE *values;
+    int size;
+    int cap;
+
+    map_KEY_VALUE()
+    {
+        keys = (KEY *)malloc(sizeof(KEY) * 16);
+        values = (VALUE *)malloc(sizeof(VALUE) * 16);
+        size = 0;
+        cap = 16;
+    }
+
+    void method_put(KEY key, VALUE value)
+    {
+        if (size + 1 >= cap)
+        {
+            cap *= 1.5;
+            keys = (KEY *)realloc(keys, sizeof(VALUE) * cap);
+            values = (VALUE *)realloc(values,sizeof(VALUE) * cap);
+        }
+        KEY k(key);
+        keys[size] = k;
+        VALUE v(value);
+        values[size] = v;
+        size++;
+    }
+
+    VALUE method_get(KEY key) {
+        for(int i=0;i<size;i++) {
+            if(keys[i]==key) {
+                return values[i];
+            }
+        }
+    }
+
+    bool method_hasKey(KEY key) {
+        for(int i=0;i<size;i++) {
+            if(keys[i]==key) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    bool method_hasValue(VALUE value) {
+        for(int i=0;i<size;i++) {
+            if(values[i]==value) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    KEY[] method_keys() {
+        return keys;
+    }
+
+    VALUE[] method_values() {
+        return values;
+    }
+
+    number method_size() {
+        return size;
+    }
+
+    void method_set(KEY key, VALUE value) {
+        for(int i=0;i<size;i++) {
+            if(keys[i]==key) {
+                VALUE v(value);
+                values[i] = v;
+                return;
+            }
+        }
+    }
+
+    VALUE operator[](KEY key) const {
+          for(int i=0;i<size;i++) {
+            if(keys[i]==key) {
+                return values[i];
+            }
+        }
+    }
+
+    VALUE &operator[](KEY key) {
+          for(int i=0;i<size;i++) {
+            if(keys[i]==key) {
+                return values[i];
+            }
+        }
+    }
+};
