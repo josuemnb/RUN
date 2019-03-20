@@ -1,6 +1,8 @@
 # Run
   Nice programming language inspired in golang with classes and generics like java
   Compiled and fast as C
+## Version - 0.0.9
+## Still lot of work to be done.
   
   Example:
   
