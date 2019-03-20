@@ -24,3 +24,10 @@
       println(c.f())
     }
 
+#Documentation
+
+  #Basic data types
+  
+  bool, number, real, string (string works as class)
+  
+  
