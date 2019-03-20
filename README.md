@@ -20,6 +20,7 @@
       info = files.info('test.run')
       println(info.exist())
       println(func())
-      println(f())
+      c:class
+      println(c.f())
     }
 
