@@ -1,9 +1,18 @@
- package run
+package run
 
 type Assign struct {
 	Kind  Type
 	Name  string
 	Right Node
+}
+
+func isConst(s string) bool {
+	for _, c := range s {
+		if (c < 'A' || c > 'Z') && c != '_' {
+			return false
+		}
+	}
+	return true
 }
 
 func (p *Module) Assign() Node {
@@ -27,6 +36,9 @@ func (p *Module) Assign() Node {
 
 func (t *Transpiler) Assign(node Node) {
 	assign := node.Value.(Assign)
+	if isConst(assign.Name) {
+		t.file.WriteString("const ")
+	}
 	if assign.Kind.Kind >= STRING || assign.Kind.Kind == QUOTE {
 		t.file.WriteString(assign.Kind.Real + " var_" + assign.Name + "(")
 		t.Transpile(assign.Right)

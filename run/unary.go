@@ -16,6 +16,12 @@ func (p *Module) unary() Node {
 
 func (t *Transpiler) Unary(node Node) {
 	u := node.Value.(Unary)
-	t.file.WriteString(u.Op)
-	t.Transpile(u.Right)
+	if u.Op == "--" || u.Op == "++" {
+		t.Transpile(u.Right)
+		t.file.WriteString(u.Op)
+	} else {
+		t.file.WriteString(u.Op)
+		t.Transpile(u.Right)
+	}
+
 }

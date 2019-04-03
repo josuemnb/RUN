@@ -28,6 +28,7 @@ func init() {
 	keywords["asm"] = ASM
 	keywords["cpp"] = CPP
 	keywords["import"] = IMPORT
+	keywords["module"] = MODULE
 }
 
 type Scanner struct {
@@ -115,6 +116,12 @@ func (s *Scanner) scanToken() {
 		if s.match('-') {
 			s.addToken(DECREMENT)
 			s.col += 2
+		} else if s.match('=') {
+			s.addToken(MINUS_EQUAL)
+			s.col += 2
+		} else if s.match('>') {
+			s.addToken(INTERFACE)
+			s.col += 2
 		} else {
 			s.addToken(MINUS)
 			s.col++
@@ -122,6 +129,9 @@ func (s *Scanner) scanToken() {
 	case '+':
 		if s.match('+') {
 			s.addToken(INCREMENT)
+			s.col += 2
+		} else if s.match('=') {
+			s.addToken(PLUS_EQUAL)
 			s.col += 2
 		} else {
 			s.addToken(PLUS)
@@ -133,6 +143,8 @@ func (s *Scanner) scanToken() {
 	case '*':
 		s.addToken(STAR)
 		s.col++
+	case '$':
+		s.addMessage()
 	case ':':
 		s.addToken(DECLARE)
 		s.col++
@@ -190,8 +202,6 @@ func (s *Scanner) scanToken() {
 		s.col = 1
 	case '"', '\'':
 		s.addString(b)
-	case '`':
-		s.addMessage()
 	default:
 		if s.isDigit(b) {
 			for s.isDigit(s.peek()) {
@@ -199,8 +209,8 @@ func (s *Scanner) scanToken() {
 			}
 			p := s.current
 			if s.peek() == '.' {
-				d := s.advance()
-				if d == '.' {
+				s.advance()
+				if s.peek() == '.' {
 					s.addTokenVal(NUMBER, s.source[s.start:p])
 					s.addToken(RANGE)
 					s.advance()
@@ -254,7 +264,7 @@ func (s *Scanner) isAlphaNum(b byte) bool {
 func (s *Scanner) addMessage() {
 	s.start = s.current
 	s.advance()
-	for !s.isAtEnd() && s.peek() != '`' {
+	for !s.isAtEnd() && s.peek() != '$' {
 		if s.peek() == '\n' {
 			s.line++
 			s.col = 1

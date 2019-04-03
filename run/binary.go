@@ -66,12 +66,25 @@ func (p *Module) adition() Node {
 
 func (p *Module) multiplication() Node {
 	var e Node
-	e = p.unary()
+	e = p.increment()
 	for p.match(SLASH, STAR) {
 		op := p.previous()
 		right := p.unary()
 		p.compare(e, right)
 		e = Node{Type: BINARY, Value: Binary{e, right, op.Lexeme}}
+	}
+	return e
+}
+
+func (p *Module) increment() Node {
+	var e Node
+	e = p.unary()
+	if p.match(INCREMENT, DECREMENT) {
+		op := p.previous()
+		if p.typeOf(e).Kind != NUMBER && p.typeOf(e).Kind != REAL {
+			p.error("Kind not incrementable", 1)
+		}
+		e = Node{Type: UNARY, Value: Unary{e, op.Lexeme}}
 	}
 	return e
 }

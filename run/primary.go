@@ -116,7 +116,11 @@ func (t *Transpiler) Identifier(node Node) {
 	case FIELD:
 		t.file.WriteString("field_" + i.Name)
 	case VARIABLE:
-		t.file.WriteString("var_" + i.Name)
+		if i.Type.IsInterface {
+			t.file.WriteString("inter_" + i.Name)
+		} else {
+			t.file.WriteString("var_" + i.Name)
+		}
 	case METHOD:
 		t.file.WriteString("method_" + i.Name)
 	case PARAM:
@@ -125,8 +129,8 @@ func (t *Transpiler) Identifier(node Node) {
 		t.file.WriteString("func_" + i.Name)
 	case CLASS:
 		t.file.WriteString("class_" + i.Name)
-		// default:
-		// 	t.file.WriteString(i.Name)
+	default:
+		// t.file.WriteString(i.Name)
 	}
 }
 

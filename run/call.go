@@ -1,6 +1,8 @@
 package run
 
-import "bytes"
+import (
+	"bytes"
+)
 
 type Call struct {
 	Name   string
@@ -22,24 +24,6 @@ func (p *Module) Instantiate(n string) Node {
 	// p.CurToken++
 	if fun, ok := class.This[f]; ok {
 		return p.GetParams(fun, THIS)
-		// 	if len(fun.Params) == 0 {
-		// 		p.consume(RIGHT_PAREN, "Expecting )")
-		// 		return Node{Type: CALL, Value: Call{Name: class.Name, Kind: CLASS, Args: nil}}
-		// 	}
-		// 	args := make([]Node, 0)
-		// 	for i, param := range fun.Params {
-		// 		if i > 0 {
-		// 			p.consume(COMMA, "Expecting comma")
-		// 		}
-		// 		arg := p.assignment()
-		// 		t := p.typeOf(arg)
-		// 		if t.Kind != param.Type.Kind {
-		// 			p.error("Mismatch kinds", 1)
-		// 		}
-		// 		args = append(args, arg)
-		// 	}
-		// 	p.consume(RIGHT_PAREN, "Expecting )")
-		// 	return Node{Type: CALL, Value: Call{Name: class.Name, Kind: CLASS, Args: args}}
 	}
 	return Node{}
 }
@@ -51,9 +35,16 @@ func (p *Module) CheckParams() string {
 		return ""
 	}
 	var buff bytes.Buffer
-	for i := 0; ; i++ {
+	for {
 		arg := p.assignment()
 		t := p.typeOf(arg)
+		if t.Kind == 0 && arg.Type == IDENTIFIER {
+			id := arg.Value.(Identifier)
+			// println(id.Name)
+			if p.isFunction(id.Name) {
+				t.Name = "ptr_func"
+			}
+		}
 		if t.Kind == QUOTE {
 			t = *p.getTypeByKind(STRING)
 		}
@@ -79,6 +70,15 @@ func (p *Module) GetParams(f Function, kind int) Node {
 		}
 		arg := p.assignment()
 		t := p.typeOf(arg)
+		if t.Kind == 0 && arg.Type == IDENTIFIER {
+			id := arg.Value.(Identifier)
+			// println(id.Name)
+			if p.isFunction(id.Name) {
+				t.Kind = FUNCTION
+				id.Kind = FUNCTION
+				arg.Value = id
+			}
+		}
 		if t.Kind == QUOTE {
 			t = *p.getTypeByKind(STRING)
 		}
@@ -117,22 +117,28 @@ func (p *Module) Call(parent interface{}) Node {
 					if m.isFunction(n) {
 						f := m.Functions[n]
 						e = p.GetParams(f, FUNCTION)
-						if f.Return.Kind >= STRING {
+						if f.Return.IsInterface {
+							parent = f.Return.Interface
+						} else if f.Return.Kind >= STRING {
 							parent = f.Return.Class
 						} else {
 							return e
 						}
 					}
-				case Function:
-					f := parent.(Function)
-					if f.isParam(id.Name) {
-						p.error("Name already assigned", 0)
-					}
-					e = p.GetParams(f, FUNCTION)
-					if f.Return.Kind >= STRING {
-						parent = f.Return.Class
+				case Interface:
+					i := parent.(Interface)
+					n := id.Name + p.CheckParams()
+					if f, ok := i.Functions[n]; ok {
+						e = p.GetParams(f, INTERFACE)
+						if f.Return.IsInterface {
+							parent = f.Return.Interface
+						} else if f.Return.Kind >= STRING {
+							parent = f.Return.Class
+						} else {
+							return e
+						}
 					} else {
-						return e
+						p.error("Unknown interface function", 1)
 					}
 				case Class:
 					c := parent.(Class)
@@ -142,7 +148,9 @@ func (p *Module) Call(parent interface{}) Node {
 							p.error("Unknown identifier", 1)
 						}
 						e = p.GetParams(f, METHOD)
-						if f.Return.Kind >= STRING {
+						if f.Return.IsInterface {
+							parent = f.Return.Interface
+						} else if f.Return.Kind >= STRING {
 							parent = f.Return.Class
 						} else {
 							return e
@@ -152,13 +160,28 @@ func (p *Module) Call(parent interface{}) Node {
 					} else {
 						p.error("Unknown Identifier", 1)
 					}
+				case Function:
+					f := parent.(Function)
+					if f.isParam(id.Name) {
+						p.error("Name already assigned", 0)
+					}
+					e = p.GetParams(f, FUNCTION)
+					if f.Return.IsInterface {
+						parent = f.Return.Interface
+					} else if f.Return.Kind >= STRING {
+						parent = f.Return.Class
+					} else {
+						return e
+					}
 				}
 			} else if p.isClass(id.Name) {
 				e = p.Instantiate(id.Name)
 			} else {
 				e = p.parseFunction(id.Name)
 				tp := p.typeOf(e)
-				if tp.Kind >= STRING {
+				if tp.IsInterface {
+					parent = tp.Interface
+				} else if tp.Kind >= STRING {
 					parent = tp.Class
 				} else {
 					return e
@@ -166,8 +189,14 @@ func (p *Module) Call(parent interface{}) Node {
 			}
 		} else if p.insideFunction() && p.ActualFunction.isParam(id.Name) {
 			v := p.ActualFunction.getParam(id.Name)
+			if v.Type.IsInterface {
+				id.Name = "inter_" + id.Name
+			}
 			e = Node{Type: IDENTIFIER, Value: Identifier{Name: id.Name, Kind: PARAM, Type: v.Type}}
-			if v.Type.Kind >= STRING {
+			if v.Type.IsInterface {
+				// op = "_"
+				parent = v.Type.Interface
+			} else if v.Type.Kind >= STRING {
 				parent = v.Type.Class
 			} else {
 				return e
@@ -175,14 +204,19 @@ func (p *Module) Call(parent interface{}) Node {
 		} else if p.insideClass() && p.ActualClass.isField(id.Name) {
 			v := p.ActualClass.Fields[id.Name]
 			e = Node{Type: IDENTIFIER, Value: Identifier{Name: id.Name, Kind: FIELD, Type: v.Type}}
-			if v.Type.Kind >= STRING {
+			if v.Type.IsInterface {
+				parent = v.Type.Interface
+			} else if v.Type.Kind >= STRING {
 				parent = v.Type.Class
 			} else {
 				return e
 			}
 		} else if v, ok := p.isVar(id.Name); ok {
 			e = Node{Type: IDENTIFIER, Value: Identifier{Name: id.Name, Kind: VARIABLE, Type: v.Type}}
-			if v.Type.Kind >= STRING {
+			if v.Type.IsInterface {
+				// op = "_"
+				parent = v.Type.Interface
+			} else if v.Type.Kind >= STRING {
 				parent = v.Type.Class
 			} else {
 				return e
@@ -190,6 +224,8 @@ func (p *Module) Call(parent interface{}) Node {
 		} else if m, ok := p.Modules[id.Name]; ok {
 			parent = *m
 			op = ""
+		} else if f, ok := p.Functions[id.Name]; ok {
+			println("FUNCTION", f.Name)
 		}
 		if p.match(DOT) && parent != nil {
 			return Node{Type: BINARY, Value: Binary{e, p.Call(parent), op}}
@@ -208,6 +244,8 @@ func (t *Transpiler) Call(node Node) {
 		t.file.WriteString("class_" + c.Name + "(")
 	} else if c.Kind == THIS {
 		t.file.WriteString("(")
+	} else if c.Kind == INTERFACE {
+		t.file.WriteString(c.Name + "(")
 	} else {
 
 	}

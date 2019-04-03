@@ -15,6 +15,15 @@ type Loop struct {
 func (p *Module) Loop() Node {
 	var loop Loop
 	p.BeginScope()
+	if p.check(LEFT_BRACE) {
+		loop.IsWhile = true
+		loop.Begin = Node{Type: LITERAL, Value: Literal{Type: *p.getTypeByKind(BOOL), Value: "true"}}
+		goto end
+	} else if p.testAll(LESS, LESS_EQUAL, EQUAL_EQUAL, BANG_EQUAL, GREATER_EQUAL, GREATER) {
+		loop.IsWhile = true
+		loop.Begin = p.assignment()
+		goto end
+	}
 	if p.check(IDENTIFIER) {
 		if p.test(EQUAL) {
 			loop.Var = "var_" + p.advance().Lexeme
@@ -22,6 +31,12 @@ func (p *Module) Loop() Node {
 			loop.Begin = p.Assign()
 		} else {
 			loop.Begin = p.assignment()
+			if loop.Begin.Type == IDENTIFIER {
+				i := loop.Begin.Value.(Identifier)
+				if _, ok := p.isVar(i.Name); !ok {
+					p.error("Value not found", 1)
+				}
+			}
 			if p.typeOf(loop.Begin).Kind == BOOL {
 				loop.IsWhile = true
 				goto end

@@ -5,12 +5,15 @@ import (
 )
 
 type Declare struct {
-	Name  string
-	Array int
-	Type  Type
+	Name        string
+	Array       int
+	Type        Type
+	Instantiate Node
+	IsVolatile  bool
 }
 
-func (p *Module) TypeDeclare(inst bool) (cls Type, array int) {
+func (p *Module) TypeDeclare(inst bool, inFunction bool) (cls Type, array int) {
+	original := p.previous().Lexeme
 	p.consume(DECLARE, "expecting :")
 	t := p.advance()
 	if t.Lexeme == "[" {
@@ -44,8 +47,26 @@ func (p *Module) TypeDeclare(inst bool) (cls Type, array int) {
 			p.error("Unknown identifier", 0)
 		}
 		cls = *typ
+		if cls.IsInterface {
+			if inFunction == false && p.check(LEFT_BRACE) {
+				cls = p.InterfaceDeclare(cls.Interface, original)
+				cls.Kind = typ.Kind
+				return
+			}
+		}
 	} else {
-		cls = *p.getTypeByName(t.Lexeme)
+		c := p.getTypeByName(t.Lexeme)
+		if c == nil {
+			p.error("Type not found", 1)
+		}
+		if c.IsInterface {
+			if inFunction == false && p.check(LEFT_BRACE) {
+				cls = p.InterfaceDeclare(c.Interface, original)
+				cls.Kind = c.Kind
+				return
+			}
+		}
+		cls = *c
 		if cls.Name == "" {
 			if p.ActualClass.Name == t.Lexeme {
 				cls = Type{Name: p.ActualClass.Name, Kind: cls.Kind, Class: p.ActualClass}
@@ -70,18 +91,45 @@ func (p *Module) TypeDeclare(inst bool) (cls Type, array int) {
 }
 
 func (p *Module) Declare() Node {
+	var inst Node
 	n := p.advance()
 	if _, ok := p.isVar(n.Lexeme); ok {
 		p.error("Variable name in use", 0)
 	}
-	cls, array := p.TypeDeclare(true)
+	cls, array := p.TypeDeclare(true, p.insideFunction())
+	if cls.Kind > STRING {
+		if len(cls.Class.This) > 0 {
+			p.consume(LEFT_PAREN, "Expecting (")
+			f := "this" + p.CheckParams()
+			// p.CurToken++
+			if fun, ok := cls.Class.This[f]; ok {
+				inst = p.GetParams(fun, THIS)
+			}
+		}
+	}
 	p.consume(EOL, "expecting end of line")
+	vol := false
+	if p.CurScope == 0 {
+		vol = true
+	}
 	p.Scopes[p.CurScope][n.Lexeme] = Variable{Name: n.Lexeme, Type: cls, Array: array}
-	return Node{Type: DECLARE, Value: Declare{Name: n.Lexeme, Type: cls, Array: array}}
+	return Node{Type: DECLARE, Value: Declare{Name: n.Lexeme, Type: cls, Array: array, Instantiate: inst, IsVolatile: vol}}
 }
 
 func (t *Transpiler) Declare(node Node) {
 	d := node.Value.(Declare)
-	t.file.WriteString(d.Type.Real + " var_" + d.Name)
-	t.file.WriteString(";\n")
+	if d.Type.IsInterface {
+		t.InterfaceDeclare(d)
+	} else {
+		if d.IsVolatile {
+			t.file.WriteString("volatile ")
+		}
+		t.file.WriteString(d.Type.Real + " var_" + d.Name)
+		if d.Instantiate.Type != 0 {
+			// t.file.WriteString("(")
+			t.Transpile(d.Instantiate)
+			// t.file.WriteString(")")
+		}
+		t.file.WriteString(";\n")
+	}
 }

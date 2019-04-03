@@ -1,12 +1,15 @@
 package run
 
 type Type struct {
-	Name       string
-	Kind       int
-	Class      Class
-	Collection int
-	Used       int
-	Real       string
+	Name        string
+	Kind        int
+	Class       Class
+	Collection  int
+	Used        int
+	Real        string
+	Parent      *Module
+	IsInterface bool
+	Interface   Interface
 }
 
 type Protection int
@@ -46,9 +49,10 @@ func (m *Module) addType(t *Type) {
 	if m.Type == MODULE {
 		t.Real = m.Name + "_"
 	}
-	if t.Kind >= STRING {
+	if t.Kind >= STRING && t.IsInterface == false {
 		t.Real += "class_"
 	}
+	t.Parent = m
 	t.Real += t.Name
 	m.Types[t.Name] = t
 }
@@ -56,6 +60,12 @@ func (m *Module) addType(t *Type) {
 func (m *Module) getTypeByName(n string) *Type {
 	if t, ok := m.Types[n]; ok {
 		return t
+	}
+	for mod, t := range m.Modules {
+		if tp := t.getTypeByName(n); tp != nil {
+			tp.Name = mod + "_" + tp.Name
+			return tp
+		}
 	}
 	return nil
 }
@@ -79,6 +89,9 @@ func (m *Module) typeOf(node Node) Type {
 	case IDENTIFIER:
 		i := node.Value.(Identifier)
 		return m.getType(i.Name)
+	case UNARY:
+		u := node.Value.(Unary)
+		return m.typeOf(u.Right)
 	case BINARY:
 		b := node.Value.(Binary)
 		t0 := m.typeOf(b.Left)
@@ -117,7 +130,9 @@ func (m *Module) typeOf(node Node) Type {
 func typeToRepr(t int) string {
 	switch t {
 	case NUMBER:
-		return "%d"
+		return "%lld"
+	case REAL:
+		return "%f"
 	case STRING, NEWLINE, QUOTE, BOOL:
 		return "%s"
 	}

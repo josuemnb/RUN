@@ -36,7 +36,7 @@ func (p *Module) error(e string, pos int) {
 		p.CurToken--
 	}
 	println("Error at file '"+p.Name+" ':", e, "'"+p.Tokens[p.CurToken-pos].Lexeme+"'", "at line", p.Tokens[p.CurToken].Line)
-	p.Finish()
+	p.Finish(false)
 	os.Exit(-1)
 }
 
@@ -51,6 +51,9 @@ func (p *Module) peek() Token {
 func (p *Module) parse() Node {
 	if p.match(EOL) {
 		return Node{Type: EOL}
+	}
+	if p.match(CPP) {
+		return p.Cpp()
 	}
 	if p.insideFunction() {
 		if p.match(IF) {
@@ -84,13 +87,7 @@ func (p *Module) parse() Node {
 		if p.test(EQUAL) {
 			return p.Assign()
 		}
-		if p.match(CPP) {
-			return p.Cpp()
-		}
 		return p.assignment()
-	}
-	if p.match(CPP) {
-		return p.Cpp()
 	}
 	if p.insideClass() == false && p.insideFunction() == false {
 		if p.match(MAIN) {
@@ -99,9 +96,15 @@ func (p *Module) parse() Node {
 		if p.test(LEFT_BRACE) {
 			return p.Class()
 		}
+		if p.test(INTERFACE) {
+			return p.Interface()
+		}
 	}
 	if p.match(IMPORT) {
 		return p.Import()
+	}
+	if p.match(MODULE) {
+		return p.Module()
 	}
 	if p.test(DECLARE) {
 		return p.Declare()
@@ -172,6 +175,11 @@ func (p *Module) compare(l, r Node) {
 	if t1.Kind == NULL && (t0.Kind >= STRING || t0.Kind == QUOTE) {
 		return
 	}
+	if t0.Kind == QUOTE && t1.Kind == STRING {
+		return
+	} else if t1.Kind == QUOTE && t0.Kind == QUOTE {
+		return
+	}
 	if t0.Kind != t1.Kind {
 		p.error("Mismatches kinds", 1)
 	}
@@ -182,6 +190,18 @@ func (p *Module) assignment() Node {
 	e = p.or()
 	if p.match(EQUAL) {
 		return Node{Type: BINARY, Value: Binary{Left: e, Op: "=", Right: p.assignment()}}
+	} else if p.match(PLUS_EQUAL) {
+		t := p.typeOf(e)
+		if t.Kind != STRING && t.Kind != NUMBER && t.Kind != REAL {
+			p.error("Type not allowed for appending", 1)
+		}
+		return Node{Type: BINARY, Value: Binary{Left: e, Op: p.previous().Lexeme, Right: p.assignment()}}
+	} else if p.match(MINUS_EQUAL) {
+		t := p.typeOf(e)
+		if t.Kind != NUMBER && t.Kind != REAL {
+			p.error("Type not allowed for appending", 1)
+		}
+		return Node{Type: BINARY, Value: Binary{Left: e, Op: p.previous().Lexeme, Right: p.assignment()}}
 	}
 	return e
 }
@@ -207,12 +227,30 @@ func (p *Module) previous() Token {
 	return p.Tokens[p.CurToken-1]
 }
 
+func (p *Module) checkAll(t ...int) bool {
+	for _, s := range t {
+		if p.check(s) {
+			return true
+		}
+	}
+	return false
+}
+
 func (p *Module) check(t int) bool {
 	if p.isAtEnd() {
 		p.error("Unexpected end of file", 0)
 		return false
 	}
 	return p.peek().Type == t
+}
+
+func (p *Module) testAll(t ...int) bool {
+	for _, s := range t {
+		if p.test(s) {
+			return true
+		}
+	}
+	return false
 }
 
 func (p *Module) test(t int) bool {

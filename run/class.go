@@ -10,6 +10,7 @@ type Class struct {
 	Methods    map[string]Function
 	This       map[string]Function
 	Kind       int
+	Cpp        []string
 	Protection Protection
 }
 
@@ -34,6 +35,12 @@ func (t *Transpiler) Class(node Node) {
 	}
 	t.file.WriteString("class_")
 	t.file.WriteString(t.class.Name + " {\n")
+	if len(class.Cpp) > 0 {
+		t.file.WriteString("private:\n")
+		for _, cpp := range class.Cpp {
+			t.file.WriteString(cpp + "\n")
+		}
+	}
 	for n, f := range class.Fields {
 		if n[0] == '_' {
 			if len(n) > 2 && n[1] == '_' {
@@ -61,7 +68,26 @@ func (t *Transpiler) Class(node Node) {
 			if i > 0 {
 				t.file.WriteString(",")
 			}
-			t.file.WriteString(p.Type.Real + " param_" + p.Name)
+			if p.Type.IsInterface {
+				// j := 0
+				// for _, pi := range p.Type.Interface.Functions {
+				// 	if j > 0 {
+				// 		t.file.WriteString(",")
+				// 	}
+				// 	t.file.WriteString("void (*param_inter_" + p.Name + "_" + pi.Real + ")(")
+				// 	for l, pf := range pi.Params {
+				// 		if l > 0 {
+				// 			t.file.WriteString(",")
+				// 		}
+				// 		t.file.WriteString(pf.Type.Real + " " + pf.Name)
+				// 	}
+				// 	t.file.WriteString(")")
+				// 	j++
+				// }
+				t.file.WriteString(p.Type.Real + " param_inter_" + p.Name)
+			} else {
+				t.file.WriteString(p.Type.Real + " param_" + p.Name)
+			}
 		}
 		t.file.WriteString(") {\n")
 
@@ -133,6 +159,7 @@ func (p *Module) Class() Node {
 	class.Fields = make(map[string]Variable)
 	class.Methods = make(map[string]Function)
 	class.This = make(map[string]Function)
+	class.Cpp = make([]string, 0)
 	// if p.Type == MODULE {
 	// 	class.Name = p.Name + "_" + cls.Lexeme
 	// } else {
@@ -186,15 +213,18 @@ func (p *Module) Class() Node {
 			class.Fields[d.Name] = Variable{Name: d.Name, Type: d.Type, Protection: p}
 		case EOL:
 			continue
+		case CPP:
+			cpp := s.Value.(Cpp)
+			class.Cpp = append(class.Cpp, cpp.Body)
 		default:
 			p.error("Not allowed code", 1)
 		}
 	}
+	class.Kind = typeIdx
 	// typ = Type{Name: class.Name, Class: class}
-	// p.updateType(&typ)
+	// p.updateType(&Type{Name: class.Name, Class: class})
 	p.EndScope()
 	p.ActualClass = Class{}
-	class.Kind = typeIdx
 	return Node{Type: CLASS, Value: class}
 }
 

@@ -53,6 +53,8 @@ func (t *Transpiler) Transpile(node Node) {
 		t.Return(node)
 	case THIS:
 		t.This(node)
+	case INTERFACE:
+		t.Interface(node)
 	case EOL:
 		t.file.WriteString(";\n")
 	case DECLARE:
