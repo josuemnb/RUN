@@ -1,12 +1,13 @@
 module files
 
-cpp {`
+cpp $
     #include <stdio.h>
     #include <stdlib.h>
     #include <unistd.h>
     #include <fcntl.h>
     #include <sys/stat.h>
-`}
+    #include <ctype.h>
+$
 
 FileInfo {
     __name:string
@@ -14,15 +15,15 @@ FileInfo {
     __exist:bool
     this(n:string) {
         __name = n
-        cpp {`
+        cpp $
             int fd = open(field___name.value,O_RDONLY);
-            if(fd>-1) {
-                field___exist = fd>-1;
+            field___exist = fd>-1;
+            if(fd>-1) {               
                 struct stat s;
                 fstat(fd,&s);
                 field___size = s.st_size;
             }
-        `}
+        $
     }
     size():number {
         return __size
@@ -37,19 +38,86 @@ FileReader {
     __fp:number
     __name:string
     __has:bool
+    __size:number
     open(name:string) {
         __name = name
-        cpp {`
+        cpp $
             field___fp  = open(field___name.value,O_RDONLY);
-        `}
-        __has = true
+            field___has = field___fp>-1;
+            if(field___has) {
+                struct stat s;
+                fstat(field___fp,&s);
+                field___size = s.st_size;
+            }
+        $
     }
-
-    readNumber():number{
+    size():number {
+        return __size
+    }
+    number():number{
         n:number
-        cpp {`
-            read(field___fp,&var_n, sizeof(var_n));              
-        `}
+        if __has==false {
+            return n
+        }
+        cpp $          
+            field___has =  read(field___fp,&var_n, sizeof(long))>0;              
+        $
+        return n
+    }
+    real():real{
+        n:real
+        cpp $
+            field___has = read(field___fp,&var_n, sizeof(float))>0;              
+        $
+        return n
+    }
+    char():string{
+        n:string
+        cpp $
+            char c[2];
+            field___has = read(field___fp,&c, 1)>0;  
+            c[1] = '\0';
+            var_n = c;            
+        $
+        return n
+    }
+    __last:number
+    next():string {
+        n = ''
+        if __has==false {
+            return n
+        }
+        cpp $
+            char c;
+            char s[128];
+            int p =1;
+            if(field___last>0) {
+                c = (char)field___last;
+                field___last = 0;
+            } else {
+                field___has = read(field___fp,&c,1)>0;
+                if(isspace(c)) {
+                    while((field___has=read(field___fp,&c,1))>0 && isspace(c));   
+                }                
+            }
+            s[0] = c;
+            if(isalpha(c)) {
+                while((field___has=read(field___fp,&c,1))>0) {
+                    if(c!='_' && !isalnum(c)) {
+                        if(!isspace(c)) {
+                            field___last = c;
+                        }  
+                        break;
+                    }                  
+                    s[p] = c;
+                    p++;
+                }
+            } else if(isdigit(c)) {
+                          
+            }
+            s[p] = '\0';
+            var_n.set(s,p);                                  
+        $ 
         return n
     }
     read(size:number):string {
@@ -57,18 +125,18 @@ FileReader {
         if __has==false {
             return s
         }
-        cpp {`
+        cpp $
             char buf[param_size];
             size_t nread;
             nread = read(field___fp, buf, param_size);   
             buf[nread] = '\0';     
             var_s = buf;
-        `}
+        $
         return s
     }
-    readLine():string {
+    line():string {
         s:string
-        cpp {`
+        cpp $
             char buf[128];
             char c;
             int i = 0,nread;
@@ -83,32 +151,31 @@ FileReader {
             }                       
             if(nread<1)
                 field___has=false;                
-        `}
+        $
         return s
     }
     has():bool {
         return __has
     }
-
     position():number {
         ret:number
-        cpp {`
+        cpp $
             var_ret = lseek(field___fp,0,SEEK_CUR);
-        `}
+        $
         return ret
     }
 
     goto(pos:number) {
-        cpp {`
+        cpp $
             lseek(field___fp,param_pos,SEEK_SET);
-        `}
+        $
     }
 
     close():bool {
         ret:bool
-        cpp {`
+        cpp $
             var_ret = close(field___fp)>-1;
-        `}
+        $
         return ret
     }
 }
@@ -118,24 +185,24 @@ FileAppender {
     __name:string
     open(name:string) {
         __name = name
-        cpp {`
+        cpp $
             field___fp  = open(field___name.value,O_APPEND|O_CREAT|O_WRONLY, 0644);
             if(field___fp<1) {
                 fprintf(stderr, "New File Error: %d\n", errno);
             }
-        `}
+        $
     }
     append(s:string) {
-        cpp {`
+        cpp $
             write(field___fp,param_s.value,param_s.len);
-        `}
+        $
     }
 
     close():bool {
         ret:bool
-        cpp {`
+        cpp $
             var_ret = close(field___fp)>-1;
-        `}
+        $
         return ret
     }
 }
@@ -145,43 +212,43 @@ FileWriter {
     __name:string
     open(name:string) {
         __name = name
-        cpp {`
+        cpp $
             field___fp  = creat(field___name.value, 0644);
             if(field___fp<1) {
                 fprintf(stderr, "New File Error: %d\n", errno);
             }
-        `}
+        $
     }
-    write(n:number) {
-        cpp {`
+    number(n:number) {
+        cpp $
            write(field___fp,&param_n,sizeof(long));        
-        `}
+        $
     }
-    write(s:string) {
-        cpp {`
+    string(s:string) {
+        cpp $
             write(field___fp,param_s.value,param_s.len);
-        `}
+        $
     }
 
     position():number {
         ret:number
-        cpp {`
+        cpp $
             var_ret = lseek(field___fp,0,SEEK_CUR);
-        `}
+        $
         return ret
     }
 
     goto(pos:number) {
-        cpp {`
+        cpp $
             lseek(field___fp,param_pos,SEEK_SET);
-        `}
+        $
     }
 
     close():bool {
         ret:bool
-        cpp {`
+        cpp $
             var_ret = close(field___fp)>-1;
-        `}
+        $
         return ret
     }
 }

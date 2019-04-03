@@ -1,0 +1,48 @@
+module to
+
+cpp $
+    #include <stdio.h>
+$
+
+string(n:number):string {
+    s:string
+    cpp $ 
+        char ch[20];
+        sprintf(ch,"%ld",param_n);
+        var_s = ch;
+    $
+    return s
+}
+
+string(n:real):string {
+    s:string
+    cpp $ 
+        char ch[26];
+        sprintf(ch,"%f",param_n);
+        var_s = ch;
+    $
+    return s
+}
+
+string(b:bool):string {
+    if b == true {
+        return 'true'
+    } 
+    return 'false'
+}
+
+number(s:string):number {
+    n:number
+    cpp $
+        var_n = atol(param_s.value);
+    $
+    return n
+}
+
+real(s:string):real {
+    n:real
+    cpp $
+        var_n = atof(param_s.value);
+    $
+    return n
+}

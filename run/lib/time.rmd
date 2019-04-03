@@ -1,0 +1,150 @@
+module time
+
+cpp $ 
+    #include <time.h>
+$
+
+number():number {
+    n:number
+    cpp $ 
+        time_t rawtime;
+        time(&rawtime);
+        var_n = rawtime;
+    $
+    return n
+}
+
+day():number {
+    d:number
+    cpp $ 
+        time_t rawtime;
+        struct tm * timeinfo;
+
+        time ( &rawtime );
+        timeinfo = localtime ( &rawtime );
+        var_d = timeinfo->tm_mday;
+    $
+    return d
+}
+
+year():number {
+    d:number
+    cpp $ 
+        time_t rawtime;
+        struct tm * timeinfo;
+
+        time ( &rawtime );
+        timeinfo = localtime ( &rawtime );
+        var_d = timeinfo->tm_year;
+    $
+    return d
+}
+
+month():number {
+    d:number
+    cpp $ 
+        time_t rawtime;
+        struct tm * timeinfo;
+
+        time ( &rawtime );
+        timeinfo = localtime ( &rawtime );
+        var_d = timeinfo->tm_mon;
+    $
+    return d
+}
+
+hour():number {
+    d:number
+    cpp $ 
+        time_t rawtime;
+        struct tm * timeinfo;
+
+        time ( &rawtime );
+        timeinfo = localtime ( &rawtime );
+        var_d = timeinfo->tm_hour;
+    $
+    return d
+}
+
+min():number {
+    d:number
+    cpp $ 
+        time_t rawtime;
+        struct tm * timeinfo;
+
+        time ( &rawtime );
+        timeinfo = localtime ( &rawtime );
+        var_d = timeinfo->tm_min;
+    $
+    return d
+}
+
+sec():number {
+    d:number
+    cpp $ 
+        time_t rawtime;
+        struct tm * timeinfo;
+
+        time ( &rawtime );
+        timeinfo = localtime ( &rawtime );
+        var_d = timeinfo->tm_sec;
+    $
+    return d
+}
+
+string():string {
+    s:string
+    cpp $ 
+        time_t rawtime;
+        struct tm * timeinfo;
+
+        time ( &rawtime );
+        timeinfo = localtime ( &rawtime );
+        var_s = asctime (timeinfo);
+    $
+    return s
+}
+
+cpp $
+    #include <windows.h>
+    #include <sys/time.h>
+$
+
+Tick->{
+    now()
+}
+
+Timer {
+    __period:number
+    __now:number
+    __tick:Tick
+    __running:bool
+    cpp $
+        HANDLE win_timer;
+        static VOID CALLBACK timer_sig_handler(PVOID ptr, BOOLEAN TimerOrWaitFired) {
+            time_class_Timer *obj = (time_class_Timer*) ptr;
+            obj->field___tick.now();
+        }
+    $
+    this(d:number) {
+        __period = d
+    }
+    start(t:Tick):bool {
+        __tick = t
+        cpp $
+            if (CreateTimerQueueTimer(&win_timer, NULL, timer_sig_handler, reinterpret_cast<PVOID>(this), 0, (DWORD)field___period, WT_EXECUTEINTIMERTHREAD) == 0) {
+                printf("Timer creation error\n");
+                return false;
+            }
+            field___running = true;
+        $
+        return true
+    }
+    stop() {
+        cpp $
+            DeleteTimerQueueTimer(NULL, win_timer, NULL);
+	        CloseHandle(win_timer);
+        $
+        __running = false
+    }
+}
