@@ -16,9 +16,10 @@ class class_string
     }
 
     class_string(char *s)
-    {
-        value = s;
+    {        
         len = strlen(s);
+        value = (char*)malloc(len);
+        strcpy(value,s);
     }
 
     class_string(class_string *s)
@@ -48,8 +49,6 @@ class class_string
     }
     class_string set(char *val, int size)
     {
-        // len = strlen(val);
-
         value = (char *)malloc(size);
         for (int i = 0; i < size; i++)
             value[i] = val[i];
@@ -101,17 +100,20 @@ class class_string
     {
         value = (char *)realloc((void *)value, len + other.len);
         strcat((char *)value, other.value);
-        len = other.len;
+        len += other.len;
         return *this;
     }
 
     class_string &operator+=(char *other)
     {
         int l = strlen(other);
-        value = (char *)realloc((void *)value, len + l);
+        value = (char *)realloc(value, len + l+1);
+        if(value==NULL) {
+            puts("Error");
+            exit(-2);
+        }
         strcat((char *)value, other);
-        value[l] = '\0';
-        len = l;
+        len += l;
         return *this;
     }
 
@@ -159,8 +161,4 @@ class class_string
     {
         return len;
     }
-
-    // ~class_string() {
-    //     free(value);
-    // }
 };

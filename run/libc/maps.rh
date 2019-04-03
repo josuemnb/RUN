@@ -65,7 +65,7 @@ class map_KEY_VALUE
         return values;
     }
 
-    number method_size() {
+    long method_size() {
         return size;
     }
 

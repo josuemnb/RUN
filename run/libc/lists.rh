@@ -39,7 +39,7 @@ class list_VALUE
         return false;
     }
 
-    number method_size() {
+    long method_size() {
         return size;
     }
 
