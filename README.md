@@ -6,7 +6,7 @@
   
   Example:
   
-    import files
+    import files, time
     
     class {
       f():string {
@@ -17,6 +17,19 @@
     func():number {
       return (10*13/4)
     }
+    
+    interface -> { // interface declaration
+      function() // virtual function, expecting implementation
+    }
+    
+    count:number
+    
+    tick:time.Tick { // implement of interface from module time
+      now() {
+        println('tick', time.number())
+        count--
+      }
+    }
 
     main {
       info = files.info('test.run')
@@ -24,6 +37,13 @@
       println(func())
       c:class
       println(c.f())
+      timer:time.Timer(1000)
+      count = 10
+      timer.start(tick)
+      loop count > 0 {
+        
+      }
+      timer.stop()
     }
 
 # Documentation
