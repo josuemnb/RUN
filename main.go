@@ -5,7 +5,5 @@ import (
 )
 
 func main() {
-	prog := run.NewProgram("test.run")
-	prog.Compile("test.cpp")
-	prog.Finish()
+	run.NewProgram("test").Compile()
 }
