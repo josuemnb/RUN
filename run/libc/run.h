@@ -22,8 +22,8 @@
 #include "class_string.h"
 
 class_string func_string_number(int n) {
-    char v[20];
-    sprintf(v,"%dl",n);
+    char v[40];
+    sprintf(v,"%lld",n);
     class_string s(v);
     return s;
 }

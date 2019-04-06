@@ -2,11 +2,11 @@
 
 class map_KEY_VALUE
 {
-  public:
     KEY *keys;
     VALUE *values;
     int size;
     int cap;
+  public:
 
     map_KEY_VALUE()
     {
@@ -33,35 +33,32 @@ class map_KEY_VALUE
 
     VALUE method_get(KEY key) {
         for(int i=0;i<size;i++) {
-            if(keys[i]==key) {
-                return values[i];
-            }
+            //keyIS_COMP if(keys[i]==key) {return values[i];}
+            //keyNOT_COMP if(&keys[i]==&key) {return values[i];}
         }
     }
 
     bool method_hasKey(KEY key) {
         for(int i=0;i<size;i++) {
-            if(keys[i]==key) {
-                return true;
-            }
+           //keyIS_COMP if(keys[i]==key) { return true; }
+           //keyNOT_COMP if(&keys[i]==&key) { return true; }
         }
         return false;
     }
 
     bool method_hasValue(VALUE value) {
         for(int i=0;i<size;i++) {
-            if(values[i]==value) {
-                return true;
-            }
+            //valueIS_COMP if(values[i]==value) { return true; }
+            //valueNOT_COMP if(&values[i]==&value) { return true; }
         }
         return false;
     }
 
-    KEY[] method_keys() {
+    KEY* method_keys() {
         return keys;
     }
 
-    VALUE[] method_values() {
+    VALUE* method_values() {
         return values;
     }
 
@@ -71,27 +68,22 @@ class map_KEY_VALUE
 
     void method_set(KEY key, VALUE value) {
         for(int i=0;i<size;i++) {
-            if(keys[i]==key) {
-                VALUE v(value);
-                values[i] = v;
-                return;
-            }
+            //keyIS_COMP if(keys[i]==key) { values[i] = value; return; }
+            //keyNOT_COMP if(&keys[i]==&key) { values[i] = value; return; }
         }
     }
 
     VALUE operator[](KEY key) const {
           for(int i=0;i<size;i++) {
-            if(keys[i]==key) {
-                return values[i];
-            }
+            //keyIS_COMP if(keys[i]==key) { return values[i]; }
+            //keyNOT_COMP if(&keys[i]==&key) { return values[i]; }
         }
     }
 
     VALUE &operator[](KEY key) {
           for(int i=0;i<size;i++) {
-            if(keys[i]==key) {
-                return values[i];
-            }
+            //keyIS_COMP if(keys[i]==key) { return values[i]; }
+            //keyNOT_COMP if(&keys[i]==&key) { return values[i]; }
         }
     }
 };
