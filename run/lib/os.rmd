@@ -1,0 +1,17 @@
+module os
+
+cpp $
+    #include <stdlib.h>
+$
+
+abort() {
+    cpp $
+        abort();
+    $
+}
+
+exit(e:number) {
+    cpp $
+        exit(param_e);
+    $
+}

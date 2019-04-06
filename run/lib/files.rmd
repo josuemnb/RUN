@@ -23,6 +23,7 @@ FileInfo {
                 fstat(fd,&s);
                 field___size = s.st_size;
             }
+            close(fd);
         $
     }
     size():number {
@@ -31,6 +32,18 @@ FileInfo {
 
     exist():bool {
         return __exist
+    }
+    remove() {
+        cpp $
+            remove(field___name.value);
+        $
+    }
+
+    rename(n:string) {
+        cpp $
+            rename(field___name.value,param_n.value);
+        $
+        __name = n
     }
 }
 

@@ -1,0 +1,94 @@
+module math '-lm'
+
+cpp $
+    #include <math.h>
+    #include <time.h>
+$
+
+cos(n:real):real {
+    ret:real
+    cpp $
+        var_ret = cos(param_n);
+    $
+    return ret
+}
+
+sin(n:real):real {
+    ret:real
+    cpp $
+        var_ret = sin(param_n);
+    $
+    return ret
+}
+
+tan(n:real):real {
+    ret:real
+    cpp $
+        var_ret = tan(param_n);
+    $
+    return ret
+}
+
+ceil(n:real):real {
+    ret:real
+    cpp $
+        var_ret = ceil(param_n);
+    $
+    return ret
+}
+
+floor(n:real):real {
+    ret:real
+    cpp $
+        var_ret = floor(param_n);
+    $
+    return ret
+}
+
+sqrt(n:real):real {
+    ret:real
+    cpp $
+        var_ret = sqrt(param_n);
+    $
+    return ret
+}
+
+cpp $
+    bool random_init = false;
+$
+
+random():number {
+    ret:number
+    cpp $
+        if(random_init==false) {
+            srand(time(NULL));
+            random_init = true;
+        }
+        var_ret = rand();
+    $
+    return ret
+}
+
+random(n:number):number {
+    ret:number
+    cpp $
+        if(random_init==false) {
+            srand(time(NULL));
+            random_init = true;
+        }
+        var_ret = rand()%param_n;
+    $
+    return ret
+}
+
+random(i:number, e:number):number {
+    ret:number
+    cpp $
+        if(random_init==false) {
+            srand(time(NULL));
+            random_init = true;
+        }
+        var_ret = (rand()%(param_e-param_i)) + param_i;
+    $
+    return ret
+}

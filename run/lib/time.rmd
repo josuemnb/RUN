@@ -110,27 +110,28 @@ cpp $
     #include <sys/time.h>
 $
 
-Tick->{
-    now()
-}
+//Tick->{
+  //  now()
+//}
 
 Timer {
     __period:number
     __now:number
-    __tick:Tick
+    //__tick:Tick
     __running:bool
     cpp $
         HANDLE win_timer;
         static VOID CALLBACK timer_sig_handler(PVOID ptr, BOOLEAN TimerOrWaitFired) {
             time_class_Timer *obj = (time_class_Timer*) ptr;
-            obj->field___tick.now();
+            //obj->field___tick.now();
         }
     $
     this(d:number) {
         __period = d
     }
-    start(t:Tick):bool {
-        __tick = t
+    //start(t:Tick):bool {
+    start():bool {
+        //__tick = t
         cpp $
             if (CreateTimerQueueTimer(&win_timer, NULL, timer_sig_handler, reinterpret_cast<PVOID>(this), 0, (DWORD)field___period, WT_EXECUTEINTIMERTHREAD) == 0) {
                 printf("Timer creation error\n");

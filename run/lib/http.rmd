@@ -1,0 +1,74 @@
+module http '-lws2_32'
+
+cpp $
+    #include <winsock2.h>
+    //#include "libc/temp/map_string_CallBack.h"
+$
+
+Connection {
+    __conn:number
+    __ip:string
+    cpp $  
+        struct sockaddr_in clientAddr; 
+    $
+    close() {
+        cpp $
+            closesocket(field___conn)
+        $
+    }
+    ip():string {
+        return __ip
+    }
+}
+
+CallBack -> {
+    request(c:Connection)
+}
+
+Server {
+    __may:bool
+    __port:number
+    cpp $ 
+        int server, j, conn, addrSize;
+        struct sockaddr_in serverAddr, clientAddr;
+        WSADATA wsaData;
+        char data;
+    $
+    this(port:number) {
+        __port = port
+        cpp $
+            memset(&serverAddr, 0, sizeof(serverAddr));
+            serverAddr.sin_family = AF_INET;
+            serverAddr.sin_addr.s_addr = htonl(INADDR_ANY);
+            serverAddr.sin_port = htons(field___port); 
+            addrSize = sizeof(clientAddr);
+        $
+    }
+    GET(s:string,call:CallBack) {
+
+    }
+    cancel() {
+        __may = false
+        cpp $
+            closesocket(server);
+            WSACleanup();
+        $
+    }
+    listen() {
+        __may = true
+        cpp $
+            WSAStartup(MAKEWORD(2, 2), &wsaData);              
+            server = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
+            bind(server, (struct sockaddr *)&serverAddr, sizeof(serverAddr));
+            listen(server, SOMAXCONN);
+            while(field___may) {
+                conn = accept(server, (struct sockaddr *)&clientAddr, &addrSize);
+                printf("New connection from %s\n", inet_ntoa(clientAddr.sin_addr));        
+                if (recv(conn, &data, 1, 0) == 1) {
+                    printf("%d\n", data);
+                }                   
+                closesocket(conn); 
+            }
+        $
+    }
+}
