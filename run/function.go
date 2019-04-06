@@ -8,6 +8,7 @@ type Function struct {
 	Protection Protection
 	Returned   int
 	Real       string
+	IsVirtual  bool
 }
 
 func (f *Function) isParam(n string) bool {
@@ -125,15 +126,20 @@ func (p *Module) Function() Node {
 	if p.ActualClass.Name == "" {
 		p.Functions[f.Real] = f
 	}
-	p.consume(LEFT_BRACE, "Expecting function block")
-	p.consume(EOL, "Expecting end of line")
-	p.ActualFunction = f
-	f.Body = p.block()
-	if p.ActualFunction.Returned == 0 && p.ActualFunction.Return.Kind >= STRING {
-		p.error("Expecting return from funcion '"+f.Name+"'", 0)
+	// p.consume(LEFT_BRACE, "Expecting function block")
+	if p.match(LEFT_BRACE) {
+		p.consume(EOL, "Expecting end of line")
+		p.ActualFunction = f
+		f.Body = p.block()
+		if p.ActualFunction.Returned == 0 && p.ActualFunction.Return.Kind >= STRING {
+			p.error("Expecting return from funcion '"+f.Name+"'", 0)
+		}
+		p.ActualFunction = Function{}
+	} else if p.insideClass() {
+		f.IsVirtual = true
+	} else {
+		p.error("Not allowed", 1)
 	}
-	p.ActualFunction = Function{}
-
 	p.EndScope()
 	return Node{Type: FUNCTION, Value: f}
 }

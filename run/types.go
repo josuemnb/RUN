@@ -31,6 +31,7 @@ var (
 func init() {
 	// typesUsed = make(map[string]bool)
 	collections = make(map[string]*Type)
+	typeIdx = STRING + 1
 	// types = make([]Type, 0)
 }
 
@@ -49,7 +50,7 @@ func (m *Module) addType(t *Type) {
 	if m.Type == MODULE {
 		t.Real = m.Name + "_"
 	}
-	if t.Kind >= STRING && t.IsInterface == false {
+	if t.Kind >= STRING && t.IsInterface == false && t.Collection == 0 {
 		t.Real += "class_"
 	}
 	t.Parent = m

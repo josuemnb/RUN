@@ -81,7 +81,11 @@ func (t *Transpiler) Finish() {
 	}
 	for b, t := range t.Program.Types {
 		if t.Kind > STRING {
-			file.WriteString("#define class_" + b + "_H\n")
+			if t.Collection == 0 {
+				file.WriteString("#include \"../../" + b + ".h\"\n")
+			} else {
+				file.WriteString("#include \"temp/" + b + ".h\"\n")
+			}
 		}
 	}
 	file.Close()

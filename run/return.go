@@ -15,8 +15,18 @@ func (p *Module) Return() Node {
 		}
 		return Node{Type: RETURN, Value: Return{Type: *p.getTypeByKind(VOID)}}
 	}
-	t := p.assignment()
-	typ := p.typeOf(t)
+	var typ Type
+	var t Node
+	if p.match(THIS) {
+		if p.insideClass() == false {
+			p.error("Only inside class body", 0)
+		}
+		t = Node{Type: THIS, Value: Identifier{Kind: THIS}}
+		typ = *p.getTypeByName(p.ActualClass.Name)
+	} else {
+		t = p.assignment()
+		typ = p.typeOf(t)
+	}
 	if typ.Kind == 0 {
 		p.error("Unknown identifier", 1)
 	}

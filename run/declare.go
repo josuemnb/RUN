@@ -97,7 +97,7 @@ func (p *Module) Declare() Node {
 		p.error("Variable name in use", 0)
 	}
 	cls, array := p.TypeDeclare(true, p.insideFunction())
-	if cls.Kind > STRING {
+	if cls.Kind > STRING && cls.IsInterface == false {
 		if len(cls.Class.This) > 0 {
 			p.consume(LEFT_PAREN, "Expecting (")
 			f := "this" + p.CheckParams()

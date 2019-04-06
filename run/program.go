@@ -81,7 +81,7 @@ func NewProgram(name string) *Module {
 	B.Kind = BOOL
 	program.addType(B)
 
-	typeIdx = 132
+	// typeIdx = 132
 	return program
 }
 

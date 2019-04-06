@@ -58,7 +58,7 @@ func (p *Module) Array(size int) Type {
 		if err != nil {
 			panic(err)
 		}
-		newContents := strings.Replace(string(read), "VALUE", cls.Name, -1)
+		newContents := strings.Replace(string(read), "VALUE", cls.Real, -1)
 		err = ioutil.WriteFile("run/libc/temp/"+explicit+".h", []byte(newContents), 0)
 		if err != nil {
 			panic(err)
@@ -101,7 +101,7 @@ func (p *Module) List() Type {
 		if err != nil {
 			panic(err)
 		}
-		newContents := strings.Replace(string(read), "VALUE", cls.Name, -1)
+		newContents := strings.Replace(string(read), "VALUE", cls.Real, -1)
 		err = ioutil.WriteFile("run/libc/temp/"+explicit+".h", []byte(newContents), 0)
 		if err != nil {
 			panic(err)
@@ -136,29 +136,30 @@ func (p *Module) Map() Type {
 	if cls.Name == "" {
 		p.error("Unkown type", 0)
 	}
-	if cls.Class.Name != "" {
-		cls.Name = "class_" + cls.Name
-	}
+	// if cls.Class.Name != "" {
+	// 	cls.Name = "class_" + cls.Name
+	// }
 	key := p.getTypeByKind(cls.Kind)
-	typs = append(typs, cls.Name)
-	explicit += "_" + cls.Name
+	typs = append(typs, cls.Real)
+	explicit += "_" + cls.Real
 	p.consume(COMMA, "Expecting , or >")
 	t = p.advance()
 	cls = p.getTypeByName(t.Lexeme)
 	if cls.Name == "" {
 		p.error("Unkown type", 0)
 	}
-	if cls.Class.Name != "" {
-		cls.Name = "class_" + cls.Name
-	}
+	// if cls.Kind >= STRING {
+	// 	cls.Name = "class_" + cls.Name
+	// }
 	value := p.getTypeByKind(cls.Kind)
-	typs = append(typs, cls.Name)
-	explicit += "_" + cls.Name
+	typs = append(typs, cls.Real)
+	explicit += "_" + cls.Real
 	p.consume(GREATER, "Expecting > for map")
 	typ := new(Type)
 	var ok bool
 	typ, ok = collections[explicit]
 	if !ok {
+		typ = new(Type)
 		path := "run/libc/maps.rh"
 		read, err := ioutil.ReadFile(path)
 		if err != nil {
@@ -166,14 +167,23 @@ func (p *Module) Map() Type {
 		}
 
 		newContents := strings.Replace(string(read), "KEY", typs[0], -1)
+		if key.Kind <= STRING {
+			newContents = strings.Replace(newContents, "//keyIS_COMP", "", -1)
+		} else {
+			newContents = strings.Replace(newContents, "//keyNOT_COMP", "", -1)
+		}
 		newContents = strings.Replace(newContents, "VALUE", typs[1], -1)
+		if value.Kind <= STRING {
+			newContents = strings.Replace(newContents, "//valueIS_COMP", "", -1)
+		} else {
+			newContents = strings.Replace(newContents, "//valueNOT_COMP", "", -1)
+		}
 		err = ioutil.WriteFile("run/libc/temp/"+explicit+".h", []byte(newContents), 0)
 		if err != nil {
 			panic(err)
 		}
 		Collections.WriteString("#include \"temp/" + explicit + ".h\"\n")
 		typ.Name = explicit
-		typ.Kind = typeIdx
 		typ.Collection = MAP
 
 		methods := make(map[string]Function)
@@ -185,7 +195,6 @@ func (p *Module) Map() Type {
 		methods["keys"] = Function{Name: "keys", Return: *key}
 		methods["clear"] = Function{Name: "clear"}
 		typ.Class = Class{Name: typ.Name, Methods: methods}
-		typeIdx++
 		p.addType(typ)
 		collections[explicit] = typ
 	}

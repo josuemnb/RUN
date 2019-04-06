@@ -1,13 +1,18 @@
 package run
 
-import "strings"
+import (
+	"os"
+	"strings"
+)
 
 type Class struct {
 	Name       string
 	Real       string
-	Super      interface{}
+	Super      []Class
 	Fields     map[string]Variable
 	Methods    map[string]Function
+	Operators  map[string]Operator
+	Virtuals   []string
 	This       map[string]Function
 	Kind       int
 	Cpp        []string
@@ -25,16 +30,64 @@ func (m *Module) getClass(c string) Class {
 	return m.Types[c].Class
 }
 
+type Operator struct {
+	op     string
+	params []Param
+	Return Type
+	Body   []Node
+	Real   string
+}
+
+func (m *Module) operator() Node {
+	var params []Param
+	op := m.previous().Lexeme
+	var ret Type
+	var real string
+	m.BeginScope()
+	if m.match(LEFT_PAREN) {
+		params, real = m.ParseParams()
+	}
+	if m.check(DECLARE) {
+		ret, _ = m.TypeDeclare(false, true)
+	}
+	m.consume(LEFT_BRACE, "Expecting function block")
+	m.consume(EOL, "Expecting end of line")
+	m.ActualFunction = Function{Name: op, Params: params, Return: ret}
+	Body := m.block()
+	if m.ActualFunction.Returned == 0 && m.ActualFunction.Return.Kind >= STRING {
+		m.error("Expecting return from funcion '"+op+"'", 0)
+	}
+	m.ActualFunction = Function{}
+	m.EndScope()
+	return Node{Type: OPERATOR, Value: Operator{op: op, params: params, Return: ret, Body: Body, Real: real}}
+}
+
 func (t *Transpiler) Class(node Node) {
 	t.insideClass = true
 	class := node.Value.(Class)
 	t.class = class
-	t.file.WriteString("\nclass ")
+	file, err := os.OpenFile(class.Name+".h", os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
+	if err != nil {
+		println(err.Error())
+		os.Exit(-1)
+	}
+	temp := t.file
+	t.file = file
+	t.file.WriteString("#pragma once\n\n#include \"run/libc/run.h\"\n\nclass ")
 	if t.Program.Type == MODULE {
 		t.file.WriteString(t.Program.Name + "_")
 	}
-	t.file.WriteString("class_")
-	t.file.WriteString(t.class.Name + " {\n")
+	t.file.WriteString("class_" + t.class.Name)
+	if len(class.Super) > 0 {
+		t.file.WriteString(": ")
+		for i, s := range class.Super {
+			if i > 0 {
+				t.file.WriteString(", ")
+			}
+			t.file.WriteString("class_" + s.Name)
+		}
+	}
+	t.file.WriteString(" {\n")
 	if len(class.Cpp) > 0 {
 		t.file.WriteString("private:\n")
 		for _, cpp := range class.Cpp {
@@ -51,7 +104,12 @@ func (t *Transpiler) Class(node Node) {
 		} else {
 			t.file.WriteString("public:\n")
 		}
-		t.file.WriteString(f.Type.Real + " field_" + n + ";\n")
+		if f.Type.IsInterface {
+			t.file.WriteString("static ")
+			t.InterfaceDeclare(Declare{Name: n, Type: f.Type})
+		} else {
+			t.file.WriteString(f.Type.Real + " field_" + n + ";\n")
+		}
 	}
 	for n, m := range class.Methods {
 		if n[0] == '_' {
@@ -63,38 +121,59 @@ func (t *Transpiler) Class(node Node) {
 		} else {
 			t.file.WriteString("public:\n")
 		}
+		if m.IsVirtual {
+			t.file.WriteString("virtual ")
+		}
 		t.file.WriteString(m.Return.Real + " method_" + n + "(")
 		for i, p := range m.Params {
 			if i > 0 {
 				t.file.WriteString(",")
 			}
 			if p.Type.IsInterface {
-				// j := 0
-				// for _, pi := range p.Type.Interface.Functions {
-				// 	if j > 0 {
-				// 		t.file.WriteString(",")
-				// 	}
-				// 	t.file.WriteString("void (*param_inter_" + p.Name + "_" + pi.Real + ")(")
-				// 	for l, pf := range pi.Params {
-				// 		if l > 0 {
-				// 			t.file.WriteString(",")
-				// 		}
-				// 		t.file.WriteString(pf.Type.Real + " " + pf.Name)
-				// 	}
-				// 	t.file.WriteString(")")
-				// 	j++
-				// }
 				t.file.WriteString(p.Type.Real + " param_inter_" + p.Name)
 			} else {
 				t.file.WriteString(p.Type.Real + " param_" + p.Name)
 			}
 		}
-		t.file.WriteString(") {\n")
+		t.file.WriteString(")")
+		if m.IsVirtual {
+			t.file.WriteString(";\n")
+		} else {
+			t.file.WriteString(" {\n")
 
-		for _, f := range m.Body {
-			t.Transpile(f)
+			for _, f := range m.Body {
+				t.Transpile(f)
+			}
+			t.file.WriteString("}\n")
 		}
-		t.file.WriteString("}\n")
+	}
+	if len(class.Operators) > 0 {
+		t.file.WriteString("public:\n")
+		for _, op := range class.Operators {
+			if op.Return.Name == class.Name {
+				t.file.WriteString(op.Return.Real + " &operator" + op.op + "(")
+			} else {
+				t.file.WriteString(op.Return.Real + " operator" + op.op + "(")
+			}
+			for i, p := range op.params {
+				if i > 0 {
+					t.file.WriteString(",")
+				}
+				if p.Type.IsInterface {
+					t.file.WriteString(p.Type.Real + " param_inter_" + p.Name)
+				} else if p.Type.Kind >= STRING {
+					t.file.WriteString(p.Type.Real + " &param_" + p.Name)
+				} else {
+					t.file.WriteString(p.Type.Real + " param_" + p.Name)
+				}
+			}
+			t.file.WriteString(") {\n")
+
+			for _, f := range op.Body {
+				t.Transpile(f)
+			}
+			t.file.WriteString("}\n")
+		}
 	}
 	if len(class.This) > 0 {
 		t.file.WriteString("public:\n")
@@ -116,15 +195,19 @@ func (t *Transpiler) Class(node Node) {
 			t.file.WriteString("}\n")
 		}
 	}
-	t.file.WriteString("}")
+	t.file.WriteString("};")
 	t.class = Class{}
 	t.insideClass = false
+	t.file.Close()
+	t.file = temp
 }
 
 func (t *Transpiler) This(node Node) {
 	this := node.Value.(Identifier)
 	if this.Kind == FIELD {
 		t.file.WriteString("field_" + this.Name)
+	} else if this.Kind == THIS {
+		t.file.WriteString("*this")
 	} else {
 		t.file.WriteString("method_" + this.Name)
 	}
@@ -150,7 +233,7 @@ func (p *Module) This() Node {
 	return Node{}
 }
 
-func (p *Module) Class() Node {
+func (p *Module) Class(extends bool) Node {
 	cls := p.consume(IDENTIFIER, "Expecting name")
 	if p.isClass(cls.Lexeme) {
 		p.error("Class already defined", 1)
@@ -159,12 +242,26 @@ func (p *Module) Class() Node {
 	class.Fields = make(map[string]Variable)
 	class.Methods = make(map[string]Function)
 	class.This = make(map[string]Function)
+	class.Operators = make(map[string]Operator)
 	class.Cpp = make([]string, 0)
-	// if p.Type == MODULE {
-	// 	class.Name = p.Name + "_" + cls.Lexeme
-	// } else {
+	class.Virtuals = make([]string, 0)
+	class.Super = make([]Class, 0)
+
 	class.Name = cls.Lexeme
-	// }
+	if extends {
+		p.consume(EXTENDS, "Expecting <- extends symbol")
+		for {
+			s := p.consume(IDENTIFIER, "Expecting name")
+			if !p.isClass(s.Lexeme) {
+				p.error("Class undefined", 1)
+			}
+			class.Super = append(class.Super, p.getClass(s.Lexeme))
+			if p.check(LEFT_BRACE) {
+				break
+			}
+			p.consume(COMMA, "Expecting comma")
+		}
+	}
 	p.consume(LEFT_BRACE, "Expecting {")
 	p.consume(EOL, "Expecting end of line")
 	p.ActualClass = class
@@ -177,6 +274,12 @@ func (p *Module) Class() Node {
 			continue
 		}
 		switch s.Type {
+		case OPERATOR:
+			o := s.Value.(Operator)
+			if _, ok := class.Operators[o.op+o.Real]; ok {
+				p.error("Operator already defined", 0)
+			}
+			class.Operators[o.op+o.Real] = o
 		case FUNCTION:
 			f := s.Value.(Function)
 			n := f.Name
@@ -199,6 +302,9 @@ func (p *Module) Class() Node {
 				class.This[n] = f
 			} else {
 				class.Methods[n] = f
+				if f.IsVirtual {
+					class.Virtuals = append(class.Virtuals, n)
+				}
 			}
 		case DECLARE:
 			d := s.Value.(Declare)
@@ -220,7 +326,7 @@ func (p *Module) Class() Node {
 			p.error("Not allowed code", 1)
 		}
 	}
-	class.Kind = typeIdx
+	// class.Kind = typeIdx
 	// typ = Type{Name: class.Name, Class: class}
 	// p.updateType(&Type{Name: class.Name, Class: class})
 	p.EndScope()

@@ -168,6 +168,12 @@ func (s *Scanner) scanToken() {
 		if s.match('=') {
 			s.addToken(LESS_EQUAL)
 			s.col += 2
+		} else if s.match('<') {
+			s.addToken(RETURN)
+			s.col += 2
+		} else if s.match('-') {
+			s.addToken(EXTENDS)
+			s.col += 2
 		} else {
 			s.addToken(LESS)
 			s.col++

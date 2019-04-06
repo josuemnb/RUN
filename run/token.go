@@ -18,6 +18,7 @@ const (
 	FUNCTION
 	INTERFACE
 	EMPTY
+	OPERATOR
 	LEFT_PAREN
 	RIGHT_PAREN
 	LEFT_BRACE
@@ -61,6 +62,7 @@ const (
 	PRINTLN
 	RETURN
 	SUPER
+	EXTENDS
 	THIS
 	TRUE
 	LOOP
@@ -81,14 +83,14 @@ const (
 	MODULE
 	MESSAGE
 	QUOTE
-	NUMBER int = 128
-	REAL   int = 129
-	BOOL   int = 130
-	STRING int = 131
-	MAP    int = 8192
-	LIST   int = 4096
-	STACK  int = 2048
-	ARRAY  int = 1024
+	MAP
+	LIST
+	STACK
+	ARRAY
+	NUMBER
+	REAL
+	BOOL
+	STRING int = 200
 )
 
 type Node struct {

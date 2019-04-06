@@ -89,15 +89,23 @@ func (p *Module) parse() Node {
 		}
 		return p.assignment()
 	}
+	if p.insideClass() && p.insideFunction() == false {
+		if p.match(EQUAL_EQUAL, EQUAL, BANG, BANG_EQUAL, LESS, LESS_EQUAL, GREATER, GREATER_EQUAL, MINUS_EQUAL, PLUS_EQUAL, MUL_EQUAL, DIV_EQUAL, PLUS, MINUS) {
+			return p.operator()
+		}
+	}
 	if p.insideClass() == false && p.insideFunction() == false {
 		if p.match(MAIN) {
 			return p.Main()
 		}
 		if p.test(LEFT_BRACE) {
-			return p.Class()
+			return p.Class(false)
 		}
 		if p.test(INTERFACE) {
 			return p.Interface()
+		}
+		if p.test(EXTENDS) {
+			return p.Class(true)
 		}
 	}
 	if p.match(IMPORT) {
