@@ -5,5 +5,5 @@ import (
 )
 
 func main() {
-	run.NewProgram("test").Compile()
+	run.LoadProgram("test.run")
 }

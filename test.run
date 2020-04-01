@@ -1,12 +1,10 @@
-import files
+class {
+    func() {
 
-func():number {
-    return (10*13/4)
+    }
 }
 
 main {
-    info = files.info('test.run')
-    println(info.exist())
-    println(func())
+    a= new(class,8)
+    a[7].func()
 }
-
