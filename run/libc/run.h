@@ -1,36 +1,54 @@
 #pragma once
 
+#include <io.h>
+#include <malloc.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <malloc.h>
-#include <io.h>
 
-#ifndef RUN_bool
-#define RUN_bool unsigned char
+#ifndef bool
+#define bool unsigned char
 #endif
 
 #define BOOL(b) b == 0 ? "false" : "true"
 
-#ifndef RUN_number
-#define RUN_number long long
+#ifndef number
+#define number long long
 #endif
 
-#ifndef RUN_real
-#define RUN_real double
+#ifndef real
+#define real double
 #endif
 
-#include "class_string.h"
+#ifndef byte
+#define byte char
+#endif
 
-class_string func_string_number(int n) {
-    char v[40];
-    sprintf(v,"%lld",n);
-    class_string s(v);
-    return s;
+#ifndef string
+#define string byte *
+#endif
+
+#define gcnew(T, size) ({  \
+    T *_new = new T[size]; \
+    _new;                  \
+})
+// #include "Run_string.h"
+
+// Run_string func_string_number(int n) {
+//     char v[40];
+//     sprintf(v,"%lld",n);
+//     Run_string s(v);
+//     return s;
+// }
+
+number func_number_string(string s) {
+    return atol(s);
 }
 
-RUN_number func_number_string(class_string s) {
-    return atol(s.value);
+void terminate(const char *msg) {
+    puts(msg);
+    exit(-1);
 }
 
-#include "types.h"
-#include "collections.h"
+// #include "includes.h"
+// #include "imports.h"
+// #include "types.h"
