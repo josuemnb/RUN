@@ -2,212 +2,104 @@ package run
 
 import (
 	"fmt"
-	"io/ioutil"
-	"os"
-	"strings"
+	"log"
 )
-
-type Map struct {
-	Name     string
-	Types    []Type
-	Explicit string
-}
-
-type Array struct {
-	Name     string
-	Type     Type
-	Explicit string
-}
 
 type Collection struct {
-	Name     string
-	Size     int
-	Explicit string
+	*Class
+	Values []string
+	Node   *Node
 }
 
-var (
-	Collections *os.File
-)
-
-func init() {
-	var err error
-	Collections, err = os.OpenFile("run/libc/collections.h", os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
-	if err != nil {
-		panic(err)
-	}
-	Collections.WriteString("#pragma once\n\n")
+func NewCollection() *Collection {
+	c := new(Collection)
+	c.Values = make([]string, 0)
+	c.Class = NewClass()
+	return c
 }
 
-func (p *Module) Array(size int) Type {
-	t := p.advance()
-	cls := p.getTypeByName(t.Lexeme)
-	if cls.Name == "" {
-		p.error("Unkown type", 0)
+func (m *Module) parseCollection(node *Node) {
+	l := len(node.Children)
+	if l == 1 || node.Children[1].Type != RIGHT_BRACKET {
+		log.Fatal("Error: Badformed line at " + fmt.Sprint(node.Token.Line))
 	}
-	if cls.Class.Name != "" {
-		cls.Name = "class_" + cls.Name
-	}
-	value := p.getTypeByKind(cls.Kind)
-	explicit := "array_" + cls.Name
-	// var typ Type
-	var ok bool
-	typ, ok := collections[explicit]
-	if !ok {
-		path := "run/libc/arrays.rh"
-		read, err := ioutil.ReadFile(path)
-		if err != nil {
-			panic(err)
-		}
-		newContents := strings.Replace(string(read), "VALUE", cls.Real, -1)
-		err = ioutil.WriteFile("run/libc/temp/"+explicit+".h", []byte(newContents), 0)
-		if err != nil {
-			panic(err)
-		}
-		Collections.WriteString("#include \"temp/" + explicit + ".h\"\n")
-		typ.Name = explicit
-		typ.Kind = typeIdx
-		typ.Collection = ARRAY | value.Kind
-		typeIdx++
+	if l > 3 {
+		if node.Children[2].Type == LEFT_BRACE && node.Children[3].Type == RIGHT_BRACE {
+			m.parseCollectionDeclare(node)
+		} else if node.Children[2].Type == EQUAL {
+			node.Code = node.Token.Value
+			node.Children[2].Code = " = "
+			node.Children[0].Code = "["
+			if len(node.Children[0].Children) == 0 || node.Children[0].Children[0].Type != NUMBER {
+				log.Fatal("Error: Expecting an index at " + fmt.Sprint(node.Token.Line))
+			}
+			node.Children[0].Children[0].Code = node.Children[0].Children[0].Token.Value
+			node.Children[1].Code = "]"
+			v := m.getVariable(node.Token.Value)
+			index, typ := m.parseExpression(node, 3)
+			if l <= index || node.Children[index].Type != NEWLINE {
+				log.Fatal("Error: Expecting end of line at " + fmt.Sprint(node.Token.Line))
+			}
+			node.Children[index].Code = ";\n"
+			if v.Type.Kind != typ {
+				log.Fatal("Error: Badformed line at " + fmt.Sprint(node.Token.Line))
+			}
+		} else if node.Children[2].Type == DOT {
 
-		methods := make(map[string]Function)
-		methods["get"] = Function{Name: "get", Params: []Param{Param{Type: *p.getTypeByKind(NUMBER)}}, Return: *value}
-		methods["add"] = Function{Name: "add", Params: []Param{Param{Type: *value}}}
-		methods["size"] = Function{Name: "size", Return: *p.getTypeByKind(NUMBER)}
-		methods["has"] = Function{Name: "has", Params: []Param{Param{Type: *value}}, Return: *p.getTypeByKind(BOOL)}
-		methods["clear"] = Function{Name: "clear"}
-		typ.Class = Class{Name: typ.Name, Methods: methods}
-		p.addType(typ)
-		collections[explicit] = typ
+		}
 	}
-	return *typ
 }
 
-func (p *Module) List() Type {
-	t := p.advance()
-	cls := p.getTypeByName(t.Lexeme)
-	if cls.Name == "" {
-		p.error("Unkown type", 0)
-	}
-	if cls.Class.Name != "" {
-		cls.Name = "class_" + cls.Name
-	}
-	value := p.getTypeByKind(cls.Kind)
-	explicit := "list_" + cls.Name
-	typ, ok := collections[explicit]
-	if !ok {
-		typ = new(Type)
-		path := "run/libc/lists.rh"
-		read, err := ioutil.ReadFile(path)
-		if err != nil {
-			panic(err)
+func (m *Module) parseCollectionDeclare(node *Node) {
+	coll := NewCollection()
+	l := len(node.Children[0].Children)
+	index := 0
+	coll.Name = m.Name + "_" + node.Token.Value
+	coll.Node = node
+	// node.NotPrint = true
+	node.Code = Values.CLASS + " " + coll.Name + "_"
+	count := 1_000_000
+	for {
+		n := node.Children[0].Children[index]
+		if n.Type != IDENTIFIER {
+			log.Fatal("Error: Expecting ValuedType at " + fmt.Sprint(node.Token.Line))
 		}
-		newContents := strings.Replace(string(read), "VALUE", cls.Real, -1)
-		err = ioutil.WriteFile("run/libc/temp/"+explicit+".h", []byte(newContents), 0)
-		if err != nil {
-			panic(err)
+		if len(n.Token.Value) != 1 {
+			log.Fatal("Error: Expected ValuedType Letter, not a string at " + fmt.Sprint(node.Token.Line))
 		}
-		Collections.WriteString("#include \"temp/" + explicit + ".h\"\n")
-		typ.Name = explicit
-		typ.Kind = typeIdx
-		typ.Collection = LIST | value.Kind
-		typeIdx++
-
-		methods := make(map[string]Function)
-		methods["get"] = Function{Name: "get", Params: []Param{Param{Type: *p.getTypeByKind(NUMBER)}}, Return: *value}
-		methods["add"] = Function{Name: "add", Params: []Param{Param{Type: *value}}}
-		methods["size"] = Function{Name: "size", Return: *p.getTypeByKind(NUMBER)}
-		methods["has"] = Function{Name: "has", Params: []Param{Param{Type: *value}}, Return: *p.getTypeByKind(BOOL)}
-		methods["clear"] = Function{Name: "clear"}
-		typ.Class = Class{Name: typ.Name, Methods: methods}
-		p.addType(typ)
-		collections[explicit] = typ
+		n.Code = n.Token.Value
+		coll.Name += "_" + n.Token.Value
+		coll.Values = append(coll.Values, n.Token.Value)
+		m.Types[n.Token.Value] = &Type{Kind: count, Name: n.Token.Value, Collection: coll, Real: n.Token.Value}
+		index++
+		if index >= l {
+			break
+		}
+		if node.Children[0].Children[index].Type != COMMA {
+			log.Fatal("Error: Expecting comma at " + fmt.Sprint(node.Token.Line))
+		}
+		node.Children[0].Children[index].Code = "_"
+		count++
+		index++
 	}
-	return *typ
-	// scopes[curScope][name] = Variable{Name: name, Type: typ, Array: -1}
-	// return Node{Type: LIST, Value: Collection{Name: name, Size: -1, Explicit: explicit}}
+	coll.Real = coll.Name
+	m.Collections[coll.Name] = coll
+	m.CurrentCollection = coll
+	m.CurrentClass = coll.Class
+	if len(node.Children[2].Children) > 0 {
+		m.parseBody(node.Children[2])
+	}
+	m.CurrentCollection = nil
+	m.CurrentClass = nil
+	node.Children[2].Code = " {\n"
+	node.Children[3].Code = "\n};\n\n"
 }
 
-func (p *Module) Map() Type {
-	p.consume(LESS, "Expecting < for map")
-	typs := make([]string, 0)
-	explicit := "map"
-	t := p.advance()
-	cls := p.getTypeByName(t.Lexeme)
-	if cls.Name == "" {
-		p.error("Unkown type", 0)
-	}
-	// if cls.Class.Name != "" {
-	// 	cls.Name = "class_" + cls.Name
-	// }
-	key := p.getTypeByKind(cls.Kind)
-	typs = append(typs, cls.Real)
-	explicit += "_" + cls.Real
-	p.consume(COMMA, "Expecting , or >")
-	t = p.advance()
-	cls = p.getTypeByName(t.Lexeme)
-	if cls.Name == "" {
-		p.error("Unkown type", 0)
-	}
-	// if cls.Kind >= STRING {
-	// 	cls.Name = "class_" + cls.Name
-	// }
-	value := p.getTypeByKind(cls.Kind)
-	typs = append(typs, cls.Real)
-	explicit += "_" + cls.Real
-	p.consume(GREATER, "Expecting > for map")
-	typ := new(Type)
-	var ok bool
-	typ, ok = collections[explicit]
-	if !ok {
-		typ = new(Type)
-		path := "run/libc/maps.rh"
-		read, err := ioutil.ReadFile(path)
-		if err != nil {
-			panic(err)
+func (c *Collection) isValuedType(s string) bool {
+	for _, k := range c.Values {
+		if k == s {
+			return true
 		}
-
-		newContents := strings.Replace(string(read), "KEY", typs[0], -1)
-		if key.Kind <= STRING {
-			newContents = strings.Replace(newContents, "//keyIS_COMP", "", -1)
-		} else {
-			newContents = strings.Replace(newContents, "//keyNOT_COMP", "", -1)
-		}
-		newContents = strings.Replace(newContents, "VALUE", typs[1], -1)
-		if value.Kind <= STRING {
-			newContents = strings.Replace(newContents, "//valueIS_COMP", "", -1)
-		} else {
-			newContents = strings.Replace(newContents, "//valueNOT_COMP", "", -1)
-		}
-		err = ioutil.WriteFile("run/libc/temp/"+explicit+".h", []byte(newContents), 0)
-		if err != nil {
-			panic(err)
-		}
-		Collections.WriteString("#include \"temp/" + explicit + ".h\"\n")
-		typ.Name = explicit
-		typ.Collection = MAP
-
-		methods := make(map[string]Function)
-		methods["get"] = Function{Name: "get", Params: []Param{Param{Type: *key}}, Return: *value}
-		methods["put"] = Function{Name: "put", Params: []Param{Param{Type: *key}, Param{Type: *value}}, Return: *value}
-		methods["size"] = Function{Name: "size", Return: *p.getTypeByKind(NUMBER)}
-		methods["hasKey"] = Function{Name: "hasKey", Params: []Param{Param{Type: *key}}, Return: *p.getTypeByKind(BOOL)}
-		methods["hasValue"] = Function{Name: "hasValue", Params: []Param{Param{Type: *value}}, Return: *p.getTypeByKind(BOOL)}
-		methods["keys"] = Function{Name: "keys", Return: *key}
-		methods["clear"] = Function{Name: "clear"}
-		typ.Class = Class{Name: typ.Name, Methods: methods}
-		p.addType(typ)
-		collections[explicit] = typ
 	}
-	return *typ
-	// scopes[curScope][name] = Variable{Name: name, Type: typ, Array: -1}
-	// return Node{Type: MAP, Value: Collection{Name: name, Explicit: explicit}}
-}
-
-func (t *Transpiler) Collection(node Node) {
-	m := node.Value.(Collection)
-	t.file.WriteString(m.Explicit + " var_" + m.Name)
-	if m.Size > 0 {
-		t.file.WriteString("(" + fmt.Sprint(m.Size) + ")")
-	}
-	t.file.WriteString(";\n")
+	return false
 }

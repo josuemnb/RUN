@@ -1,71 +1,96 @@
 package run
 
-type Print struct {
-	Body    []Node
-	Code    []Type
-	newline bool
+import (
+	"fmt"
+	"log"
+	"os"
+	"strings"
+)
+
+func (m *Module) parsePrint(node *Node, newLine bool) {
+	var buff strings.Builder
+	// var back strings.Builder
+	node.Parsed = true
+	l := len(node.Children)
+	if l == 0 {
+		log.Fatal("Error: Expecting '(' at " + fmt.Sprint(node.Token.Line))
+		os.Exit(-2)
+	}
+	params := node.Children[0]
+	if params.Type != LEFT_PAREN {
+		log.Fatal("Error: Expecting '(' at " + fmt.Sprint(node.Token.Line))
+		os.Exit(-2)
+	}
+	idx := l - 1
+	if node.Children[idx].Type == NEWLINE {
+		idx--
+	}
+	if node.Children[idx].Type != RIGHT_PAREN {
+		log.Fatal("Error: Expecting ')' at " + fmt.Sprint(node.Token.Line))
+		os.Exit(-2)
+	}
+	node.Children[idx].Code = ");\n"
+	params.Parsed = true
+	l = len(params.Children)
+	index := 0
+	var s string
+	buff.WriteString("printf(\"")
+	for {
+		s, index = m.parsePrintParam(params, index)
+		buff.WriteString(s)
+		if index >= l {
+			break
+		}
+	}
+	if newLine {
+		buff.WriteString("\\n")
+	}
+	params.Code = buff.String() + "\", " // + back.String() + ");\n"
 }
 
-func (p *Module) Print(nl bool) Node {
-	p.Ignore = true
-	body := make([]Node, 0)
-	code := make([]Type, 0)
-	if p.match(LEFT_PAREN) {
-		for {
-			a := p.assignment()
-			code = append(code, p.typeOf(a))
-			body = append(body, a)
-			if p.match(RIGHT_PAREN) {
-				break
-			}
-			p.consume(COMMA, "Expecting ) or ,")
-		}
-	} else {
-		p.consume(LEFT_BRACE, "Expecting ( or {")
-		p.consume(EOL, "Expecting end of line")
-		for !p.match(RIGHT_BRACE) {
-			a := p.assignment()
-			code = append(code, p.typeOf(a))
-			body = append(body, a)
-			if p.match(EOL) {
-				if p.match(RIGHT_BRACE) {
-					break
-				}
-				body = append(body, Node{Type: NEWLINE})
-			} else {
-				p.consume(COMMA, "Expecting } or , or newline")
-			}
-		}
+func stringToPrint(v string) (s string) {
+	switch v {
+	case "Run_number":
+		s = "%lld"
+	case "Run_bool":
+		s = "%s"
+	case "Run_real":
+		s = "%f"
+	case "Run_string":
+		s = "%s"
+	case "Run_byte":
+		s = "%c"
 	}
-	p.Ignore = false
-	p.consume(EOL, "Expecting end of line")
-	return Node{Type: PRINT, Value: Print{Body: body, Code: code, newline: nl}}
+	return
 }
 
-func (t *Transpiler) Print(node Node) {
-	t.Printing = true
-	p := node.Value.(Print)
-	t.file.WriteString("printf(\"")
-	for _, n := range p.Code {
-		t.file.WriteString(typeToRepr(n.Kind))
+func intToPrint(t int) string {
+	switch t {
+	case NUMBER:
+		return "%lld"
+	case REAL:
+		return "%f"
+	case BYTE:
+		return "%c"
+	case STRING, QUOTE, BOOL:
+		return "%s"
 	}
-	if p.newline {
-		t.file.WriteString("\\n")
+	return "%x"
+}
+
+func (m *Module) parsePrintParam(node *Node, index int) (s string, i int) {
+	node.Parsed = true
+	if node.Children[index].Type == COMMA {
+		s = " "
+		node.Code = ", "
+		i = index + 1
+		return
 	}
-	t.file.WriteString("\"")
-	for i, n := range p.Body {
-		t.file.WriteString(",")
-		if p.Code[i].Kind == BOOL {
-			t.file.WriteString("BOOL(")
-		}
-		t.Transpile(n)
-		if p.Code[i].Kind == STRING {
-			t.file.WriteString(".value")
-		}
-		if p.Code[i].Kind == BOOL {
-			t.file.WriteString(")")
-		}
+	var t int
+	i, t = m.parseExpression(node, index)
+	if index > 0 {
+		node.Children[index].Code = ", " + node.Children[index].Code
 	}
-	t.file.WriteString(");\n")
-	t.Printing = false
+	s += intToPrint(t)
+	return
 }

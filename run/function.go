@@ -1,183 +1,238 @@
 package run
 
+import (
+	"fmt"
+	"log"
+	"strings"
+)
+
 type Function struct {
-	Params     []Param
-	Body       []Node
-	Return     Type
-	Name       string
-	Protection Protection
-	Returned   int
-	Real       string
-	IsVirtual  bool
+	Name      string
+	Address   string
+	Real      string
+	Parent    interface{}
+	Params    []*Variable
+	Variables map[string]*Variable
+	Return    int
+	Access    int
 }
 
-func (f *Function) isParam(n string) bool {
+func NewFunction() *Function {
+	f := new(Function)
+	f.Params = make([]*Variable, 0)
+	f.Variables = make(map[string]*Variable)
+	f.Access = PUBLIC
+	return f
+}
+
+func (f *Function) HasParam(s string) bool {
 	for _, p := range f.Params {
-		if p.Name == n {
+		if s == p.Name {
 			return true
 		}
 	}
 	return false
 }
 
-func (f *Function) getParam(n string) Param {
-	for _, p := range f.Params {
-		if p.Name == n {
-			return p
+func (f *Function) HasVariable(s string) bool {
+	for _, p := range f.Variables {
+		if s == p.Name {
+			return true
 		}
 	}
-	return Param{}
+	return false
 }
 
-func (p *Module) PointerFunction() Node {
-	var f Function
-	t := p.advance()
-	if p.isFunction(t.Lexeme) {
-		p.error("Function name already assigned", 1)
-	}
-	if _, ok := p.isVar(t.Lexeme); ok {
-		p.error("Name already assigned to var", 1)
-	}
-	f.Name = t.Lexeme
-	if p.Type == MODULE {
-		f.Real = p.Name + "_"
-	}
-	// if block == false {
-	// 	f.Real += "param_"
-	// }
-	f.Real += f.Name
-	p.advance()
-	var real string
-	f.Params, real = p.ParseParams()
-	f.Real += real
-	f.Return = *p.getTypeByKind(VOID)
-	if p.ActualClass.Name == "" {
-		p.Functions[f.Real] = f
-	}
-	return Node{Type: FUNCTION, Value: f}
+func (f *Function) AddParam(v *Variable) {
+	f.Params = append(f.Params, v)
+	f.Variables[v.Name] = v
+	f.Real += "_" + v.Type.Name
 }
 
-func (p *Module) ParseParams() (params []Param, real string) {
-	params = make([]Param, 0)
-	if !p.match(RIGHT_PAREN) {
-		for {
-			var param Param
-			n := p.advance()
-			for _, pm := range params {
-				if pm.Name == n.Lexeme {
-					p.error("Name already assigned", 0)
-				}
-			}
-			param.Name = n.Lexeme
-			if p.check(DECLARE) {
-				cls, array := p.TypeDeclare(true, true)
-				param.Type = cls
-				p.Scopes[p.CurScope][param.Name] = Variable{Name: param.Name, Type: cls, Array: array}
-				// } else if p.check(LEFT_PAREN) {
-				// 	p.rollBack()
-				// 	pfunc := p.PointerFunction()
-				// 	pValue := pfunc.Value.(Function)
-				// 	param.Type = Type{Kind: FUNCTION, Function: pfunc, IsFunction: true}
-				// 	param.Type.Name = "ptr_" + pValue.Real
-				// 	p.Scopes[p.CurScope][param.Name] = Variable{Name: param.Name, Type: param.Type}
+func (m *Module) FunctionDeclare(node *Node) {
+	index := 0
+	if node.Children[index+1].Type != RIGHT_PAREN {
+		log.Fatal("Error: End of declaration not correct at " + fmt.Sprint(node.Token.Line))
+	}
+	name := node.Token.Value
+	node.Parsed = true
+	function := NewFunction()
+	function.Return = VOID
+	function.Parent = m
+	function.Name = name
+	m.CurrentFunction = function
+	if m.insideClass() {
+		if strings.HasPrefix(name, "_") {
+			if strings.HasPrefix(name, "__") {
+				node.Code = Values.PRIVATE
+				function.Access = PRIVATE
 			} else {
-				param.Type = *p.getTypeByName("string")
-				p.Scopes[p.CurScope][param.Name] = Variable{Name: param.Name, Type: param.Type}
+				node.Code = Values.PROTECTED
+				function.Access = PROTECTED
 			}
-			real += "_" + param.Type.Name
-			params = append(params, param)
-			if p.match(RIGHT_PAREN) {
+		} else {
+			node.Code = Values.PUBLIC
+			function.Access = PUBLIC
+		}
+		m.CurrentClass.Functions[name] = function
+		m.CurrentClass.CurrentFunction = function
+		function.Real = m.CurrentClass.Real + "_" + function.Name
+	} else {
+		m.Functions[name] = function
+		function.Real = m.Name + "_" + name
+	}
+	if len(node.Children[index].Children) > 0 {
+		m.parseParams(node.Children[index])
+	}
+	index += 2
+	if node.Children[index].Type == DECLARE {
+		index++
+		if node.Children[index].Type != IDENTIFIER {
+			log.Fatal("Error: Expecting type of return at " + fmt.Sprint(node.Token.Line))
+		}
+		typ := m.getTypeByName(node.Children[index].Token.Value)
+		if typ == nil {
+			log.Fatal("Error: Unknown type '" + node.Children[index].Token.Value + "' at " + fmt.Sprint(node.Token.Line))
+		}
+		function.Return = typ.Kind
+		index++
+	}
+	if node.Children[index].Type != LEFT_BRACE {
+		log.Fatal("Error: Expecting '{' at " + fmt.Sprint(node.Token.Line))
+	}
+	if node.Children[index+1].Type != RIGHT_BRACE {
+		log.Fatal("Error: Expecting '}' at " + fmt.Sprint(node.Token.Line))
+	}
+	node.Code += m.getTypeByIndex(m.CurrentFunction.Return).Real + " " + name + "("
+	node.Children[index].Code = ") {\n"
+	if len(node.Children[index].Children) > 0 {
+		m.parseBody(node.Children[index])
+	}
+	if function.Return != VOID {
+		node.Children[index+1].Code = "\nterminate(\"Error: Function returning value undefined\");\n}\n"
+	} else {
+		node.Children[index+1].Code += "\n}\n"
+	}
+	m.CurrentFunction = nil
+	if m.insideClass() {
+		m.CurrentClass.CurrentFunction = nil
+	}
+}
+
+func (m *Module) parseParams(params *Node) {
+	l := len(params.Children)
+	index := 0
+	counter := 1
+	for {
+		index = m.parseParamsNode(params, index, counter)
+		counter++
+		if index >= l {
+			break
+		}
+		if params.Children[index].Type != COMMA {
+			log.Fatal("Error: Expecting ',' at " + fmt.Sprint(params.Token.Line))
+		}
+		params.Children[index].Parsed = true
+		params.Children[index].Code = ", "
+		index++
+	}
+}
+
+func (m *Module) parseParamsNode(params *Node, index int, number int) int {
+	l := len(params.Children)
+	n := params.Children[index]
+	n.Parsed = true
+	if n.Type != IDENTIFIER {
+		log.Fatal("Error: Expecting a Identifier at " + fmt.Sprint(params.Token.Line))
+	}
+	if m.CurrentFunction.HasParam(n.Token.Value) {
+		log.Fatal("Error: Name already in use at " + fmt.Sprint(params.Token.Line))
+	}
+	if l == index+1 {
+		n.Code = "string " + n.Token.Value
+		m.CurrentFunction.AddParam(&Variable{Name: n.Token.Value, Type: m.getTypeByName("string")})
+		return index + 1
+	}
+	if l < index+3 {
+		log.Fatal("Error: Expecting a type at " + fmt.Sprint(params.Token.Line))
+	}
+	n1 := params.Children[index+1]
+	if n1.Type == COMMA {
+		n.Code = "string " + n.Token.Value
+		m.CurrentFunction.AddParam(&Variable{Name: n.Token.Value, Type: m.getTypeByName("string")})
+		return index + 1
+	}
+	n1.Parsed = true
+	if n1.Type != DECLARE {
+		log.Fatal("Error: Expecting a ':'' at " + fmt.Sprint(params.Token.Line))
+	}
+	n1 = params.Children[index+2]
+	n1.Parsed = true
+	if n.Type != IDENTIFIER {
+		log.Fatal("Error: Expecting a Type at " + fmt.Sprint(params.Token.Line))
+	}
+	n.Code = stringToType(n1.Token.Value) + " " + n.Token.Value
+	m.CurrentFunction.AddParam(&Variable{Name: n.Token.Value, Type: m.getTypeByName(n1.Token.Value)})
+	return index + 3
+}
+
+func (m *Module) parseReturn(node *Node) {
+	if m.insideFunction() == false {
+		log.Fatal("Error: Return only allowed inside functions body at " + fmt.Sprint(node.Token.Line))
+	}
+	if m.CurrentFunction.Return == VOID {
+		log.Fatal("Error: Function doesn't return values at " + fmt.Sprint(node.Token.Line))
+	}
+	node.Parsed = true
+	node.Code = Values.RETURN
+	index, t := m.parseExpression(node, 0)
+	kind := m.CurrentFunction.Return
+	if len(node.Children) <= index || node.Children[index].Type != NEWLINE {
+		log.Fatal("Error: Expecting end of line at " + fmt.Sprint(node.Token.Line))
+	}
+	node.Children[index].Parsed = true
+	node.Children[index].Code = ";\n"
+	if t != kind {
+		log.Fatal("Error: Mismatches types at " + fmt.Sprint(node.Token.Line))
+	}
+}
+
+func (m *Module) parseFunctionCall(node *Node) {
+	f, _ := m.getFunction(node.Token.Value)
+	node.Code = node.Token.Value
+	node.Parsed = true
+	if node.Children[0].Type == LEFT_PAREN {
+		if node.Children[1].Type != RIGHT_PAREN {
+			log.Fatal("Error: Expecting ')' at " + fmt.Sprint(node.Token.Line))
+		}
+		node.Children[1].Parsed = true
+		node.Children[1].Code = ")"
+		node.Children[0].Parsed = true
+		node.Children[0].Code = "("
+		params := node.Children[0].Children
+		childs := len(params)
+		l := len(f.Params)
+		if (l > 1 && l != (childs+1)/2) || (l == 1 && l != childs) {
+			log.Fatal("Error: Wrong size of parameters at " + fmt.Sprint(node.Token.Line))
+		}
+		for i := 0; i < l; i++ {
+			_, t := m.parseExpression(node.Children[0], i*2)
+			kind := f.Params[i].Type.Kind
+			if t != kind {
+				log.Fatal("Error: Mismatches types at " + fmt.Sprint(node.Token.Line))
+			}
+			if i*2+1 >= childs {
 				break
 			}
-			p.consume(COMMA, "Expecting ) or ,")
+			if params[i*2+1].Type != COMMA {
+				log.Fatal("Error: Expecting comma at " + fmt.Sprint(node.Token.Line))
+			}
+			params[i*2+1].Code = ", "
+			params[i*2+1].Parsed = true
 		}
-	}
-	return
-}
 
-func (p *Module) Function() Node {
-	var f Function
-	t := p.advance()
-	if p.isFunction(t.Lexeme) {
-		p.rollBack()
-		return p.Call(p.Functions[t.Lexeme])
-	}
-	if _, ok := p.isVar(t.Lexeme); ok {
-		p.error("Name already assigned to var", 0)
-	}
-	f.Name = t.Lexeme
-	if p.Type == MODULE {
-		f.Real = p.Name + "_"
-	}
-	// if block == false {
-	// 	f.Real += "param_"
-	// }
-	f.Real += f.Name
-	p.advance()
-	p.BeginScope()
-	var real string
-	f.Params, real = p.ParseParams()
-	f.Real += real
-	f.Return = *p.getTypeByKind(VOID)
-	if p.check(DECLARE) {
-		cls, _ := p.TypeDeclare(false, true)
-		f.Return = cls
-	}
-	if p.ActualClass.Name == "" {
-		p.Functions[f.Real] = f
-	}
-	// p.consume(LEFT_BRACE, "Expecting function block")
-	if p.match(LEFT_BRACE) {
-		p.consume(EOL, "Expecting end of line")
-		p.ActualFunction = f
-		f.Body = p.block()
-		if p.ActualFunction.Returned == 0 && p.ActualFunction.Return.Kind >= STRING {
-			p.error("Expecting return from funcion '"+f.Name+"'", 0)
-		}
-		p.ActualFunction = Function{}
-	} else if p.insideClass() {
-		f.IsVirtual = true
-	} else {
-		p.error("Not allowed", 1)
-	}
-	p.EndScope()
-	return Node{Type: FUNCTION, Value: f}
-}
-
-func (t *Transpiler) PointerFunction(node Node) {
-	f := node.Value.(Function)
-
-	t.file.WriteString(f.Return.Real + " (*func_" + f.Real + ")(")
-	for i, p := range f.Params {
-		if i > 0 {
-			t.file.WriteString(", ")
-		}
-		// if p.Type.IsFunction {
-		// 	// t.file.WriteString(p.Type.Real + " func_" + p.Name)
-		// 	t.PointerFunction(p.Type.Function)
-		// } else {
-		t.file.WriteString(p.Type.Real + " param_" + p.Name)
-		// }
-	}
-	t.file.WriteString(")")
-}
-
-func (t *Transpiler) Function(node Node) {
-	f := node.Value.(Function)
-	t.file.WriteString(f.Return.Real + " func_" + f.Real + "(")
-	for i, p := range f.Params {
-		if i > 0 {
-			t.file.WriteString(", ")
-		}
-		if p.Type.IsInterface {
-			t.file.WriteString(p.Type.Real + " param_inter_" + p.Name)
-		} else {
-			t.file.WriteString(p.Type.Real + " param_" + p.Name)
+		if f.Return == VOID || (len(node.Children) > 2 && node.Children[2].Type == NEWLINE) {
+			node.Children[1].Code += ";\n"
 		}
 	}
-	t.file.WriteString(") {\n")
-	for _, n := range f.Body {
-		t.Transpile(n)
-	}
-	t.file.WriteString("}\n")
 }

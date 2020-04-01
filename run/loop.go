@@ -1,110 +1,94 @@
 package run
 
-import "fmt"
+import (
+	"fmt"
+	"log"
+	"os"
+)
 
-type Loop struct {
-	Begin   Node
-	End     Node
-	Step    Node
-	Var     string
-	IsNew   bool
-	Block   []Node
-	IsWhile bool
-}
-
-func (p *Module) Loop() Node {
-	var loop Loop
-	p.BeginScope()
-	if p.check(LEFT_BRACE) {
-		loop.IsWhile = true
-		loop.Begin = Node{Type: LITERAL, Value: Literal{Type: *p.getTypeByKind(BOOL), Value: "true"}}
-		goto end
-	} else if p.testAll(LESS, LESS_EQUAL, EQUAL_EQUAL, BANG_EQUAL, GREATER_EQUAL, GREATER) {
-		loop.IsWhile = true
-		loop.Begin = p.assignment()
-		goto end
+func (m *Module) parseLoop(node *Node) {
+	node.Parsed = true
+	l := len(node.Children)
+	if l < 2 || node.Children[l-2].Type != LEFT_BRACE || node.Children[l-1].Type != RIGHT_BRACE {
+		log.Fatal("Error: Badformed loop at " + fmt.Sprint(node.Token.Line))
+		os.Exit(-1)
 	}
-	if p.check(IDENTIFIER) {
-		if p.test(EQUAL) {
-			loop.Var = "var_" + p.advance().Lexeme
-			p.rollBack()
-			loop.Begin = p.Assign()
-		} else {
-			loop.Begin = p.assignment()
-			if loop.Begin.Type == IDENTIFIER {
-				i := loop.Begin.Value.(Identifier)
-				if _, ok := p.isVar(i.Name); !ok {
-					p.error("Value not found", 1)
-				}
-			}
-			if p.typeOf(loop.Begin).Kind == BOOL {
-				loop.IsWhile = true
-				goto end
-			}
-		}
-	}
-	if loop.Var == "" {
-		loop.Var = "loop_" + fmt.Sprint(p.Tokens[p.CurToken].Line)
-		// if p.check(LEFT_BRACE) {
-		// 	goto end
-		// }
-		if !p.check(RANGE) {
-			loop.Begin = p.assignment()
-		}
-	}
-	if p.match(RANGE) {
-		loop.End = p.assignment()
-	}
-	if p.match(COMMA) {
-		loop.Step = p.assignment()
-	}
-end:
-	p.consume(LEFT_BRACE, "Expecting begin of loop block")
-	p.consume(EOL, "Expecting end of line")
-	p.InsideLoop = true
-	loop.Block = p.block()
-	p.InsideLoop = false
-	p.EndScope()
-	return Node{Type: LOOP, Value: loop}
-}
-
-func (t *Transpiler) Loop(node Node) {
-	// beginScope()
-	loop := node.Value.(Loop)
-	if loop.IsWhile {
-		t.file.WriteString("while(")
-		t.Transpile(loop.Begin)
+	if l == 2 {
+		node.Code = "while(1) {\n"
 	} else {
-		t.file.WriteString("for(")
-		if loop.Begin.Type > 0 {
-			if loop.Var[0:5] == "loop_" {
-				t.file.WriteString("number " + loop.Var + "=")
-				t.Transpile(loop.Begin)
+		index := 0
+		node.Code = "for("
+		n := node.Children[index]
+		n.Parsed = true
+		name := "loop_" + fmt.Sprint(node.Token.Line) + "_" + fmt.Sprint(node.Token.Col)
+		if n.Type == IDENTIFIER {
+			name = n.Token.Value
+			if v := m.getVariable(name); v != nil {
+				if v.Type.Kind != NUMBER && v.Type.Kind != REAL {
+					log.Fatal("Error: Only number and real values allowed in loop at " + fmt.Sprint(node.Token.Line))
+					os.Exit(-1)
+				}
+				n.Code += name
 			} else {
-				t.Transpile(loop.Begin)
+				n.Code += "int " + name
 			}
+			index++
+			n = node.Children[index]
 		} else {
-			t.file.WriteString("number " + loop.Var + "=0")
+			node.Code += "int " + name
 		}
-		t.file.WriteString(";" + loop.Var + "<")
-		t.Transpile(loop.End)
-		t.file.WriteString(";" + loop.Var)
-		if loop.Step.Type == UNARY {
-			t.file.WriteString("-=")
-			t.Transpile(loop.Step.Value.(Node))
+		n.Parsed = true
+		if n.Type == EQUAL {
+			n.Code += " = "
+			index = m.parseLoopValue(node, index+1)
+			node.Children[index-1].Code += ";"
+			n = node.Children[index]
+		} else if n.Type != RANGE {
+			index = m.parseLoopValue(node, index)
+			n.Code = " = " + n.Code
+			n = node.Children[index]
+			n.Code += ";"
 		} else {
-			if loop.Step.Type == 0 {
-				t.file.WriteString("++")
+			n.Code += " = 0;"
+		}
+		n.Parsed = true
+		if n.Type == RANGE {
+			n.Code += name + "<"
+			index = m.parseLoopValue(node, index+1)
+			node.Children[index-1].Code += ";"
+			n = node.Children[index]
+		} else {
+			n.Code += ";"
+		}
+		n.Parsed = true
+		n.Code += name
+		if n.Type == COMMA {
+			if node.Children[index+1].Type == MINUS {
+				index++
+				n.Code += "-="
 			} else {
-				t.file.WriteString("+=")
-				t.Transpile(loop.Step)
+				n.Code += "+="
 			}
+			index = m.parseLoopValue(node, index+1)
+			node.Children[index].Code = ") {\n"
+		} else {
+			n.Code += "++) {"
 		}
 	}
-	t.file.WriteString(") {\n")
-	for _, n := range loop.Block {
-		t.Transpile(n)
+	idx := l - 1
+	if node.Children[idx].Type == NEWLINE {
+		idx--
 	}
-	t.file.WriteString("}\n")
-	// endScope()
+	idx--
+	m.parseBody(node.Children[idx])
+	node.Children[idx+1].Code = "\n}\n"
+}
+
+func (m *Module) parseLoopValue(node *Node, index int) int {
+	temp, t := m.parseExpression(node, index)
+	if t != NUMBER && t != REAL {
+		log.Fatal("Error: Only number and real values allowed in loop at " + fmt.Sprint(node.Token.Line))
+		os.Exit(-1)
+	}
+	return temp
 }
